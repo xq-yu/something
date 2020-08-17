@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import metrics 
+from scipy.stats import chi2
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import seaborn as sns
 class preprocessing:
 	def missing_cal(self, df):
 		"""
@@ -168,8 +171,6 @@ class preprocessing:
 		output:
 			psi: psi值
 		"""
-		import numpy as np
-		import pandas as pd
 		if category_type == False:
 			# 分桶
 			quantiles = list(np.arange(0.1, 1, 0.1))
@@ -214,7 +215,6 @@ class preprocessing:
 		output:
 			psi: pd df
 		"""
-		import pandas as pd
 		psi = []
 		for col in cat_fea:
 			psi.append(self.__PsiOneCol__(
@@ -233,7 +233,6 @@ class preprocessing:
 		input:
 			arr:二维混淆矩阵（2*N）
 		'''
-		import numpy as np
 		R_N = np.array([arr.sum(axis=1)])
 		C_N = np.array([arr.sum(axis=0)])
 		N = arr.sum()
@@ -257,8 +256,6 @@ class preprocessing:
 			cut_points: list，分割点
 		Notes:
 		"""
-		import numpy as np
-		import pandas as pd
 		# 无监督分箱方法
 		if method == 'qcut':
 			quantiles = list(np.arange(1/bins_num, 1, 1/bins_num))
@@ -269,7 +266,7 @@ class preprocessing:
 			step = (max(col)-min(col))/bins_num
 			cut_points = list(np.arange(min(col)+step, max(col), step))
 			cut_points = [-np.inf]+cut_points+[np.inf]
-		else:
+		elif method == 'cust':
 			cut_points = list(set(cut_points))
 			cut_points.sort()
 		labels = list(range(len(cut_points)-1))
@@ -295,10 +292,6 @@ class preprocessing:
 			如果bins_num不存在，根据threshold进行分箱
 			如果bins_num 和 threshold 都不存在，则根据根据95%置信度设置threshold 进行分箱
 		"""
-		from scipy.stats import chi2
-		import numpy as np
-		import pandas as pd
-		
 		# 连续性变量卡方分箱
 		if category_type == False:
 			# 分箱并计算每个箱中每一类的数量
@@ -408,8 +401,6 @@ class preprocessing:
 			woe: woe映射关系
 		Notes:
 		"""
-		import pandas as pd
-		import numpy as np
 		eps = 0.00001
 		tmp = list(target.unique())
 		tmp.remove(pos_label)
@@ -441,8 +432,6 @@ class preprocessing:
 			iv: 该字段iv值
 		Notes:
 		"""
-		import pandas as pd
-		import numpy as np
 		eps = 0.00001
 		tmp = list(target.unique())
 		tmp.remove(pos_label)
@@ -476,7 +465,6 @@ class preprocessing:
 			vif: vif值
 		Notes:
 		"""		
-		from statsmodels.stats.outliers_influence import variance_inflation_factor
 		vif = []
 		tmp = df.values
 		for col in subset:
@@ -665,7 +653,6 @@ class afterprocessing:
 			plt.show()		
 	
 	def cols_compare(self,col,label,x_label = None,y_label = None, bins = 50,merge=True,ran=None):
-		import seaborn as sns
 		"""
 		purpose:
 			对比不同标签下特征的分布差异
