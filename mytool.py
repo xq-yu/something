@@ -665,6 +665,7 @@ class afterprocessing:
 			plt.show()		
 	
 	def cols_compare(self,col,label,x_label = None,y_label = None, bins = 50,merge=True,ran=None):
+		import seaborn as sns
 		"""
 		purpose:
 			对比不同标签下特征的分布差异
