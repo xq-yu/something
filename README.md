@@ -1,5 +1,6 @@
 # something
 some code can be reuse
+<<<<<<< HEAD
 
 # FeatureEngeering
 - 主要用于传统机器学习方法的特征处理，包括特征分析，特征筛选等功能
@@ -12,5 +13,3 @@ some code can be reuse
     - bert
     - roberta
     -
-
-# setest 
