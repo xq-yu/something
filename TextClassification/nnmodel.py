@@ -200,15 +200,23 @@ class netBert(nn.Module):
 #                                                        模型训练预测集成
 ########################################################################################################################
 class NN_Model:
-    def __init__(self, net, device, optimizer=None, lossfun=None, evalfun=None):
+    def __init__(self, net, device, optimizer=None, lossfun=None, evalfun=None,track_params=[]):
         self.net = net
         self.device = device
         self.optimizer = optimizer
         self.lossfun = lossfun
         self.evalfun = evalfun
         self.learning_curve = []
+        self.track_params = track_params
+        self.param_curves = [[] for _ in range(len(track_params))]
+        self.param_append()
+    
+    def param_append(self):
+        for i,curve in enumerate(self.param_curves):
+            curve.append([self.track_params[i].item()])
 
     def train(self, train_iter, val_iter, epoch_num, early_stop_rounds, print_freq):
+        plt.figure(figsize=[16,8])
         for epoch in range(epoch_num):
             loss_sum = 0  # 累计损失
             sample_count = 0  # 累计样本
@@ -231,22 +239,35 @@ class NN_Model:
 
                 # minibatch 训练过程打印
                 if k % print_freq == 0:
+
+
+                    # 参数迭代曲线
+                    self.param_append()
+                    for i,curve in enumerate(self.param_curves):
+                        plt.subplot(len(self.param_curves),2,i*2+1)
+                        plt.cla()
+                        plt.plot(curve,'.-')
+                        plt.grid()
+                        if i<len(self.param_curves)-1:
+                            plt.xticks([])
+                    plt.xlabel('batch_num')
+
+                    # batch 学习曲线
                     perform_batch.append([k, loss.item()])
-                    plt.subplot(211)
+                    plt.subplot(2,2,2)
                     plt.cla()
                     plt.plot([x[0] for x in perform_batch], [x[1]
                                                              for x in perform_batch], '.-')
                     plt.xlabel('batch_number')
                     plt.ylabel('average loss in current epoch')
-                    plt.title('procession: %s of %s batches_total; %s epoch of %s epochs total' % (
-                        k, len(train_iter), epoch, epoch_num))
+                    #plt.title('procession: %s of %s batches_total; %s epoch of %s epochs total' % (k, len(train_iter), epoch, epoch_num))
                     plt.grid()
                     plt.pause(0.3)
 
             # epoch 结果打印
             self.learning_curve.append(
                 [epoch, self.eval(train_iter), self.eval(val_iter)])
-            plt.subplot(212)
+            plt.subplot(2,2,4)
             plt.cla()
             plt.plot([x[0] for x in self.learning_curve],
                      [x[1] for x in self.learning_curve],
@@ -494,4 +515,5 @@ class BiLSTM_CRF(nn.Module):
         # Find the best path, given the features.
         score, tag_seq = self._viterbi_decode(lstm_feats)
         return score, tag_seq
+
 

@@ -1,16 +1,20 @@
+import os
+os.chdir('C:/Users/yuxiaoqiang/Desktop/coding/something/TextClassification/')
+#os.chdir('/content/drive/My Drive/colab_share/TextClassification')
+
 import pandas as pd
 import numpy as np
 from transformers import BertModel, BertTokenizer, AdamW
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-import nnmodel
+#import nnmodel
 import random
 from sklearn.model_selection import train_test_split
+
+import importlib
+importlib.reload(nnmodel)
 import functions as myfun
-import os
-os.chdir('/Users/yu/Desktop/coding/github/something/TextClassification')
-#os.chdir('/content/drive/My Drive/colab_share/TextClassification')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -46,7 +50,7 @@ class mynetwork(nn.Module):
         else:
             in_features = 10
         self.fc1 = torch.nn.Linear(bias=True, in_features=in_features, out_features=40)
-        self.fc2 = nn.Linear(10, 10)
+        self.fc2 = nn.Linear(40, 10)
         self.classifier = nn.Linear(10, 5)
 
     def forward(self, text):
@@ -79,6 +83,7 @@ test_batch_iter = myfun.batch_iter(sentences=testset.Phrase,
                                    sorted=True)
 
 random.shuffle(train_batch_iter)
+
 
 ########################################################################################################################
 #                                                              2.
@@ -222,7 +227,7 @@ def evaluation(y_hat,y):
 
 
 # 7. 定义优化器
-opitmizer = torch.optim.SGD(net.parameters(), lr=0.05)
+opitmizer = torch.optim.SGD(net.parameters(), lr=0.1)
 # opitmizer = AdamW(net.parameters(),
 #                   lr=0.000001,
 #                   betas=(0.9, 0.999),
@@ -241,13 +246,14 @@ model = nnmodel.NN_Model(net=net,
                          device=device,
                          optimizer=opitmizer,
                          lossfun=lossfun,
-                         evalfun=evaluation)
+                         evalfun=evaluation,
+                         track_params=net.fc1.weight[1][1])
 
 # 12. 模型训练
 model.train(train_iter=train_batch_iter,
             val_iter=val_batch_iter,
             epoch_num=1000,
-            early_stop_rounds=1,
+            early_stop_rounds=3,
             print_freq=100)
 
 ########################################################################################################################
