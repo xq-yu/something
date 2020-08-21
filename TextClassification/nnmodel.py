@@ -9,6 +9,161 @@ import functions as myfun
 import pandas as pd
 import csv
 
+########################################################################################################################
+#                                                        模型训练预测集成
+########################################################################################################################
+class NN_Model:
+    """
+    net: pytorch nn.Module对象
+    device: pytorch device对象
+    optimizer: pytorch 优化器
+    lossfun: 损失函数
+    evalfun: 评价函数
+    track_params: 训练追踪参数
+    """
+    def __init__(self, net, device, optimizer=None, lossfun=None, evalfun=None,track_params=[]):
+        self.net = net
+        self.device = device
+        self.optimizer = optimizer
+        self.lossfun = lossfun
+        self.evalfun = evalfun
+        self.learning_curve = []
+        self.track_params = track_params
+        self.param_curves = [[] for _ in range(len(track_params))]
+        self._param_append_()
+    
+    # 保存追踪参数用于可视化
+    def _param_append_(self):
+        for i,curve in enumerate(self.param_curves):
+            curve.append([self.track_params[i].item()])
+
+    def train(self, train_iter, val_iter, epoch_num, early_stop_rounds, print_freq):
+        """
+        purpose:
+            模型训练并显示训练过程
+        inputs:
+            train_iter: 训练集迭代器(X,y)，每个元素为一个batch
+            val_iter: 验证集迭代器，每个元素为一个batch
+            epoch_num: epoch 上限
+            early_stop_rounds: 提前终止轮数
+            print_freq: 训练过程打印频率
+        """
+        plt.figure(figsize=[16,8])
+        for epoch in range(epoch_num):
+            loss_sum = 0  # 累计损失
+            perform_batch = []
+            for k, batch in enumerate(train_iter):
+                self.net.train()   # 将模型设置成训练模式
+                X = batch[1].to(self.device)
+                y = batch[2].to(self.device)
+                y_hat = self.net(X)
+                loss = self.lossfun(y_hat, y)
+
+                # 反向传播梯度更新
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                # minibatch 训练过程打印
+                if k % print_freq == 0:
+
+                    # 1. 参数迭代曲线
+                    self._param_append_()
+                    for i,curve in enumerate(self.param_curves):
+                        plt.subplot(len(self.param_curves),2,i*2+1)
+                        plt.cla()
+                        plt.plot(curve,'.-')
+                        plt.grid()
+                        if i<len(self.param_curves)-1:
+                            plt.xticks([])
+                    plt.xlabel('batch_num')
+
+                    # 2. batch 学习曲线
+                    perform_batch.append([k, loss.item()])
+                    plt.subplot(2,2,2)
+                    plt.cla()
+                    plt.plot([x[0] for x in perform_batch], [x[1]
+                                                             for x in perform_batch], '.-')
+                    plt.xlabel('batch_number')
+                    plt.ylabel('average loss in current epoch')
+                    #plt.title('procession: %s of %s batches_total; %s epoch of %s epochs total' % (k, len(train_iter), epoch, epoch_num))
+                    plt.grid()
+                    plt.pause(0.3)
+
+            # epoch 结果打印
+            self.learning_curve.append(
+                [epoch, self.eval(train_iter), self.eval(val_iter)])
+            plt.subplot(2,2,4)
+            plt.cla()
+            plt.plot([x[0] for x in self.learning_curve],
+                     [x[1] for x in self.learning_curve],
+                     '.-',
+                     label='train')
+            plt.plot([x[0] for x in self.learning_curve],
+                     [x[2] for x in self.learning_curve],
+                     '.-',
+                     label='validation')
+            plt.legend()
+            plt.xlabel('epoch_num')
+            plt.ylabel('evaliation criteria')
+            plt.title('epoch summary')
+            plt.grid()
+            plt.pause(0.3)
+
+            # early stop
+            if self.__judge_early_stop__(early_stop_rounds):
+                print('reached early_stop_rounds; training stop')
+                return
+
+    def __judge_early_stop__(self, early_stop_rounds):
+        if early_stop_rounds is not None and len(self.learning_curve) > early_stop_rounds:
+            tmp1 = [x[2] for x in self.learning_curve[-early_stop_rounds-1:-1]]
+            tmp2 = [x[2] for x in self.learning_curve[-early_stop_rounds:]]
+            diff = np.array(tmp2)-np.array(tmp1)
+            if len(self.learning_curve) > early_stop_rounds and sum(diff > 0) == 0:
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    def eval(self, val_iter):
+        """
+        purpose:
+            模型预测并验证
+        inputs:
+            val_iter: 验证集迭代器(X,y)，每个元素为一个batch
+        """
+        _, y_hat = self.predict(val_iter)
+        y = []
+        for batch in val_iter:
+            y = y + list(batch[2].numpy())
+        y = np.array(y)
+        re = self.evalfun(y_hat, y)
+        return re
+
+    def predict(self, test_iter):
+        """
+        purpose:
+            模型预测
+        inputs:
+            test_iter: 预测集迭代器(X)，每个元素为一个batch
+        """
+        self.net.eval()  # 将模型设置成预测模式
+        array_y = None
+        array_id = None
+        with torch.no_grad():
+            for batch in test_iter:
+                ID = batch[0]
+                X = batch[1].to(self.device)
+                y_hat = self.net(X)
+                if array_y is not None:
+                    array_y = np.row_stack((array_y, y_hat.cpu().numpy()))
+                    array_id = array_id+ID
+                else:
+                    array_y = y_hat.cpu().numpy()
+                    array_id = ID
+        return array_id, array_y
 
 ########################################################################################################################
 #                                                        Glove 模块
@@ -17,8 +172,11 @@ class nnGlove(nn.Module):
     '''
     purpose:
         导入glove模型，建立基于glove 的embedding嵌入层
+    inputs:
+        glove_file: glove 词向量文件
+        oobIndex: oob 单词索引
+        padIdex: 填充词索引
     '''
-
     def __init__(self, glove_file, oobIndex, padIndex):
         super().__init__()
         self.embedMatrix, self.words_dict = self.load_glove(glove_file)
@@ -54,13 +212,12 @@ class nnGlove(nn.Module):
         embedding = pd.read_csv(
             filename, sep=' ', quoting=csv.QUOTE_NONE, header=None)
         embedding = embedding.drop_duplicates(subset=[0])
-        # 建立单词映射字典，从1～N
-        words_dict = {embedding.iloc[value, 0]: value +
-                      1 for value in range(embedding.shape[0])}
+        # 建立单词映射字典，从2～N；0,1 预留给oobindex 和padindex
+        words_dict = {embedding.iloc[value, 0]: value + 2 for value in range(embedding.shape[0])}
 
-        # embedding 矩阵，第0行为OOB单词向量
+        # embedding 矩阵，第0,1行为为预留向量，可用于OOB和padding
         embedding = embedding.iloc[:, 1:].values
-        embedding = np.row_stack([[0]*embedding.shape[1], embedding])
+        embedding = np.row_stack([[0]*embedding.shape[1], [0]*embedding.shape[1], embedding])
         return embedding, words_dict
 
     def forward(self, text):
@@ -167,7 +324,6 @@ class netBert(nn.Module):
     note:
 
     '''
-
     def __init__(self, bert_file, vocab_file):
         super().__init__()
         self.tokenizer = BertTokenizer.from_pretrained(vocab_file)
@@ -197,138 +353,6 @@ class netBert(nn.Module):
 
 
 ########################################################################################################################
-#                                                        模型训练预测集成
-########################################################################################################################
-class NN_Model:
-    def __init__(self, net, device, optimizer=None, lossfun=None, evalfun=None,track_params=[]):
-        self.net = net
-        self.device = device
-        self.optimizer = optimizer
-        self.lossfun = lossfun
-        self.evalfun = evalfun
-        self.learning_curve = []
-        self.track_params = track_params
-        self.param_curves = [[] for _ in range(len(track_params))]
-        self.param_append()
-    
-    def param_append(self):
-        for i,curve in enumerate(self.param_curves):
-            curve.append([self.track_params[i].item()])
-
-    def train(self, train_iter, val_iter, epoch_num, early_stop_rounds, print_freq):
-        plt.figure(figsize=[16,8])
-        for epoch in range(epoch_num):
-            loss_sum = 0  # 累计损失
-            sample_count = 0  # 累计样本
-            perform_batch = []
-            for k, batch in enumerate(train_iter):
-                self.net.train()   # 将模型设置成训练模式
-                X = batch[1].to(self.device)
-                y = batch[2].to(self.device)
-                y_hat = self.net(X)
-                loss = self.lossfun(y_hat, y)
-
-                # 反向传播梯度更新
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
-
-                # 训练过程打印
-                loss_sum += loss.item()
-                sample_count += len(y)
-
-                # minibatch 训练过程打印
-                if k % print_freq == 0:
-
-
-                    # 参数迭代曲线
-                    self.param_append()
-                    for i,curve in enumerate(self.param_curves):
-                        plt.subplot(len(self.param_curves),2,i*2+1)
-                        plt.cla()
-                        plt.plot(curve,'.-')
-                        plt.grid()
-                        if i<len(self.param_curves)-1:
-                            plt.xticks([])
-                    plt.xlabel('batch_num')
-
-                    # batch 学习曲线
-                    perform_batch.append([k, loss.item()])
-                    plt.subplot(2,2,2)
-                    plt.cla()
-                    plt.plot([x[0] for x in perform_batch], [x[1]
-                                                             for x in perform_batch], '.-')
-                    plt.xlabel('batch_number')
-                    plt.ylabel('average loss in current epoch')
-                    #plt.title('procession: %s of %s batches_total; %s epoch of %s epochs total' % (k, len(train_iter), epoch, epoch_num))
-                    plt.grid()
-                    plt.pause(0.3)
-
-            # epoch 结果打印
-            self.learning_curve.append(
-                [epoch, self.eval(train_iter), self.eval(val_iter)])
-            plt.subplot(2,2,4)
-            plt.cla()
-            plt.plot([x[0] for x in self.learning_curve],
-                     [x[1] for x in self.learning_curve],
-                     '.-',
-                     label='train')
-            plt.plot([x[0] for x in self.learning_curve],
-                     [x[2] for x in self.learning_curve],
-                     '.-',
-                     label='validation')
-            plt.legend()
-            plt.xlabel('epoch_num')
-            plt.ylabel('evaliation criteria')
-            plt.title('epoch summary')
-            plt.grid()
-            plt.pause(0.3)
-
-            # early stop
-            if self.judge_early_stop(early_stop_rounds):
-                print('reached early_stop_rounds; training stop')
-                return
-
-    def judge_early_stop(self, early_stop_rounds):
-        if early_stop_rounds is not None and len(self.learning_curve) > early_stop_rounds:
-            tmp1 = [x[2] for x in self.learning_curve[-early_stop_rounds-1:-1]]
-            tmp2 = [x[2] for x in self.learning_curve[-early_stop_rounds:]]
-            diff = np.array(tmp2)-np.array(tmp1)
-            if len(self.learning_curve) > early_stop_rounds and sum(diff > 0) == 0:
-                return True
-            else:
-                return False
-        else:
-            return False
-
-    def eval(self, val_iter):
-        _, y_hat = self.predict(val_iter)
-        y = []
-        for batch in val_iter:
-            y = y + list(batch[2].numpy())
-        y = np.array(y)
-        re = self.evalfun(y_hat, y)
-        return re
-
-    def predict(self, test_iter):
-        self.net.eval()  # 将模型设置成预测模式
-        array_y = None
-        array_id = None
-        with torch.no_grad():
-            for batch in test_iter:
-                ID = batch[0]
-                X = batch[1].to(self.device)
-                y_hat = self.net(X)
-                if array_y is not None:
-                    array_y = np.row_stack((array_y, y_hat.cpu().numpy()))
-                    array_id = array_id+ID
-                else:
-                    array_y = y_hat.cpu().numpy()
-                    array_id = ID
-        return array_id, array_y
-
-
-########################################################################################################################
 #                                               Attention 模块
 ########################################################################################################################
 class netAttention(nn.Module):
@@ -355,7 +379,6 @@ class netAttention(nn.Module):
         attention = torch.bmm(alpha_seq.permute([0, 2, 1]),
                               value_seq)
         return attention
-
 
 ########################################################################################################################
 #                                               CRF 模块
@@ -391,14 +414,22 @@ class BiLSTM_CRF(nn.Module):
         self.tag_to_ix = tag_to_ix
         self.tagset_size = len(tag_to_ix)
 
+        self.word_embeds = nn.Embedding(vocab_size, embedding_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2,
+                            num_layers=1, bidirectional=True)
+
+        # Maps the output of the LSTM into tag space.
+        self.hidden2tag = nn.Linear(hidden_dim, self.tagset_size)
 
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
+        # 定义y_i-1 y_i的转移概率*系数*矩阵
         self.transitions = nn.Parameter(
             torch.randn(self.tagset_size, self.tagset_size))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
+        # 强制设置从stop_tag的出发以及到达start_tag的概率无限小
         self.transitions.data[tag_to_ix[START_TAG], :] = -10000
         self.transitions.data[:, tag_to_ix[STOP_TAG]] = -10000
 
@@ -409,12 +440,15 @@ class BiLSTM_CRF(nn.Module):
                 torch.randn(2, 1, self.hidden_dim // 2))
 
     def _forward_alg(self, feats):
+
+        # 增加start_tag作为初始标签，并且设置该标签概率远大于其他标签
         # Do the forward algorithm to compute the partition function
         init_alphas = torch.full((1, self.tagset_size), -10000.)
         # START_TAG has all of the score.
         init_alphas[0][self.tag_to_ix[START_TAG]] = 0.
 
         # Wrap in a variable so that we will get automatic backprop
+        # 定义前向向量
         forward_var = init_alphas
 
         # Iterate through the sentence
@@ -423,6 +457,7 @@ class BiLSTM_CRF(nn.Module):
             for next_tag in range(self.tagset_size):
                 # broadcast the emission score: it is the same regardless of
                 # the previous tag
+                # 将lstm的输出(未做softmax)的作为特征，即CRF中的f(y_i,x,i),但是没有可学习的参数
                 emit_score = feat[next_tag].view(
                     1, -1).expand(1, self.tagset_size)
                 # the ith entry of trans_score is the score of transitioning to
@@ -435,7 +470,11 @@ class BiLSTM_CRF(nn.Module):
                 # scores.
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
             forward_var = torch.cat(alphas_t).view(1, -1)
+
+            # 强制以stop_tag结束
         terminal_var = forward_var + self.transitions[self.tag_to_ix[STOP_TAG]]
+        
+        # 计算归一化分母Z(x)
         alpha = log_sum_exp(terminal_var)
         return alpha
 

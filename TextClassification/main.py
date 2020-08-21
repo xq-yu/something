@@ -8,7 +8,7 @@ from transformers import BertModel, BertTokenizer, AdamW
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-#import nnmodel
+import nnmodel
 import random
 from sklearn.model_selection import train_test_split
 
@@ -89,6 +89,7 @@ random.shuffle(train_batch_iter)
 #                                                              2.
 #                                                     RNN 架构文本多分类模型
 #                                                      一层RNN+3层全连接
+#                                                        增加attention层
 #                                                   glove.6B.50d词向量嵌入
 ########################################################################################################################
 '''
@@ -227,13 +228,20 @@ def evaluation(y_hat,y):
 
 
 # 7. 定义优化器
-opitmizer = torch.optim.SGD(net.parameters(), lr=0.1)
+#opitmizer = torch.optim.SGD(net.parameters(), lr=0.1)
 # opitmizer = AdamW(net.parameters(),
 #                   lr=0.000001,
 #                   betas=(0.9, 0.999),
 #                   eps=1e-06,
 #                   weight_decay=0.0,
 #                   correct_bias=True)
+
+opitmizer = AdamW(net.parameters(),
+                  lr=0.0001,
+                  betas=(0.9, 0.999),
+                  eps=1e-06,
+                  weight_decay=0.0,
+                  correct_bias=True)
 
 # 8. 定义损失函数
 lossfun = nn.CrossEntropyLoss()
@@ -247,7 +255,7 @@ model = nnmodel.NN_Model(net=net,
                          optimizer=opitmizer,
                          lossfun=lossfun,
                          evalfun=evaluation,
-                         track_params=net.fc1.weight[1][1])
+                         track_params=[])#[net.fc1.weight[1][1],net.net_rnn.rnn.weight_hh_l0[1][1],net.net_rnn.rnn.weight_hh_l0[3][1]])
 
 # 12. 模型训练
 model.train(train_iter=train_batch_iter,
