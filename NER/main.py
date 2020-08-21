@@ -13,6 +13,18 @@ import random
 from sklearn.model_selection import train_test_split
 
 
+f = open('C:/Users/yuxiaoqiang/Desktop/coding/something/NER/data/train.txt')
+data = np.array(f.readlines())
+f.close
+
+split_points = [-1]+list(np.where(data=='\n'))
+data = [x[0:-1].split(' ') for x in data]
+
+
+for i,v in range(len(data)):
+    sdfs
 def read_data(file):
     with f = open(file):
+        sdfsdf
+
         
