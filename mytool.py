@@ -5,6 +5,7 @@ from sklearn import metrics
 from scipy.stats import chi2
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import seaborn as sns
+import json
 class preprocessing:
 	def missing_cal(self, df):
 		"""
@@ -693,6 +694,16 @@ class afterprocessing:
 				plt.ylabel(y_label)
 			plt.xlabel(x_label) 
 			plt.show()
-
-		
-		
+	
+	
+class modelfit:
+	def __init__(self,config_file)
+		self.config_file = config_file
+	
+	def para_read(config_file):
+		with open(config_file, encoding="utf-8") as f:
+			tmp = f.readlines()
+			tmp = [x.split("//")[0] for x in tmp]
+			json_file = json.load(''.join(tmp))
+		return model_para
+	
