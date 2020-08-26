@@ -699,11 +699,25 @@ class afterprocessing:
 class modelfit:
 	def __init__(self,config_file)
 		self.config_file = config_file
-	
-	def para_read(config_file):
+		
+	def model_define(self):
+		from sklearn.linear_model import LogisticRegression
+		from xgboost import XGBClassifier
+		from sklearn.ensemble import RandomForestClassifier
+		parameters = self._para_read_(self.config_file)
+		model_dict = {}
+		model_dict['LogisticRegression'] = LogisticRegression(**parameters['LogisticRegression'])
+		model_dict['XGBClassifier'] = LogisticRegression(**parameters['XGBClassifier'])
+		model_dict['RandomForestClassifier'] = LogisticRegression(**parameters['RandomForestClassifier'])
+
+	def _para_read_(self,config_file):
 		with open(config_file, encoding="utf-8") as f:
 			tmp = f.readlines()
 			tmp = [x.split("//")[0] for x in tmp]
 			json_file = json.load(''.join(tmp))
 		return model_para
+
+	def fit(self,model_ls,X,y):
+		for model 
+
 	
