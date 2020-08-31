@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn import metrics 
+from sklearn import metrics
+from sklearn.model_selection import GridSearchCV
 from scipy.stats import chi2
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import seaborn as sns
@@ -12,9 +13,9 @@ class preprocessing:
 		purpose：
 			计算特征数据缺失占比
 		input：
-			df：输入数据集
+			df:pd.DataFrame  输入数据集
 		output:
-			返回一个dataframe：col，missing_pct
+			missing_df:pd.DataFrame  [col，missing_pct]
 		"""
 		missing_series = df.isnull().sum() / df.shape[0]
 		missing_df = pd.DataFrame(missing_series).reset_index()
@@ -29,10 +30,10 @@ class preprocessing:
 		purpose：
 			删除缺失率过高的字段
 		input：
-			df：输入的数据集
-			threshold: 缺失率阈值，删除缺失率大于等于该值的字段
+			df：pd.DataFrame输入的数据集
+			threshold: float 缺失率阈值，删除缺失率大于等于该值的字段
 		output：
-			过滤后的dataframe
+			df_new: pd.DataFrame 过滤后的dataframe
 		"""
 		if not subset:
 			subset = df.columns
@@ -49,11 +50,11 @@ class preprocessing:
 		purpose:
 			删除某个常值占比过大的字段
 		input:
-			df:数据集
-			threshold: 单值占比阈值
-			subset:考虑的部分字段，默认为None
+			df:pd.DataFrame数据集
+			threshold: float 单值占比阈值
+			subset:list 考虑的部分字段，默认为None
 		output:
-			过滤后的数据集
+			df_new: pd.DataFrame 过滤后的数据集
 		"""
 		df_new = df.copy()
 		col_drop = []
@@ -72,11 +73,11 @@ class preprocessing:
 		purpose:
 			删除某个方差过小的字段
 		input:
-			df:数据集
-			threshold: 标准差阈值
-			subset:考虑的部分字段，默认为None
+			df:pd.DataFrame 数据集
+			threshold: float标准差阈值
+			subset:list 考虑的部分字段，默认为None
 		output:
-			过滤后的数据集  
+			df_new: pd.DataFrame 过滤后的数据集  
 		"""
 		df_new = df.copy()
 		if not subset:
@@ -92,9 +93,9 @@ class preprocessing:
 		purpose:
 			对数据类型进行规整，将可以转化为数值型的字段转换为数值类型
 		input:
-			df:数据集
+			df:pd.DataFrame 数据集
 		output:
-			df_new:转换后的数据集
+			df_new:pd.DataFrame 转换后的数据集
 		"""
 		df_new = df.copy()
 		col_type = pd.DataFrame(df_new.dtypes).reset_index()
@@ -116,13 +117,13 @@ class preprocessing:
 		purpose:
 			根据数值个数区分连续变量和离散变量
 		input:  
-			df:数据集
-			threshold: 取值小于该阈值的字段为类别型变量，大于该值为连续型变量
-			subset:考虑的部分字段，默认为None
+			df:pd.DataFrame 数据集
+			threshold: float 取值小于该阈值的字段为类别型变量，大于该值为连续型变量
+			subset:list 考虑的部分字段，默认为None
 		output:
-			feature_cat: 类别型变量（取值数量小于等于阈值的字段）
-			feature_num: 数值型变量，类别为数值型，且取值个数大于阈值
-			feature_res: 存在矛盾的变量或其他类型字段，需进一步判断别（1.非object类型字段和数值型字段；2.object型字段但是取值数量大于阈值）
+			feature_cat: list 类别型变量（取值数量小于等于阈值的字段）
+			feature_num: list 数值型变量，类别为数值型，且取值个数大于阈值
+			feature_res: list 存在矛盾的变量或其他类型字段，需进一步判断别（1.非object类型字段和数值型字段；2.object型字段但是取值数量大于阈值）
 		"""
 		feature_cat = []
 		feature_num = []
@@ -148,12 +149,12 @@ class preprocessing:
 		purpose:
 			合并样本数较少的类别
 		input:  
-			trainset: pandas Series 数据列1
-			threshold：将样本数小于 threshold 的类别合并
+			trainset: pd.Series 数据列1
+			threshold：float 将样本数小于 threshold 的类别合并
 			tag: 合并类别的标签
 		output:
-			col: 合并后的新列
-			merge_cats: 合并的类别列表
+			col: pd.Series 合并后的新列
+			merge_cats: list 合并的类别列表
 		"""
 		tmp = col.value_counts()
 		merge_cats = list(tmp.loc[tmp<threshold].index)
@@ -166,11 +167,11 @@ class preprocessing:
 		purpose:
 			计算一个变量的psi稳定性，对连续性变量默认等频分10个桶进行计算
 		input:  
-			trainset: pandas Series 数据列1
-			testset: pandas Series 数据列2
-			category_type:是否为类别型变量
+			trainset: pd.Series 数据列1
+			testset: pd.Series 数据列2
+			category_type:bool 是否为类别型变量
 		output:
-			psi: psi值
+			psi: flaot psi值
 		"""
 		if category_type == False:
 			# 分桶
@@ -209,12 +210,12 @@ class preprocessing:
 			计算一个df指定字段的psi稳定性，对连续性变量默认等频分10个桶进行计算
 			spi大于 0.25 说明极不稳定
 		input:  
-			trainset: pandas df 数据集1
-			testset: pandas df 数据集2
-			cat_fea: 需要分析的类别型变量
-			num_fea: 需要分析的数值型变量
+			trainset: pd.DataFrame 数据集1
+			testset: pd.DataFrame 数据集2
+			cat_fea: list 需要分析的类别型变量
+			num_fea: list 需要分析的数值型变量
 		output:
-			psi: pd df
+			psi: pd.DataFame   [columns,psi]
 		"""
 		psi = []
 		for col in cat_fea:
@@ -232,7 +233,7 @@ class preprocessing:
 		purpose:
 			计算卡方值
 		input:
-			arr:二维混淆矩阵（2*N）
+			arr:np.array 二维混淆矩阵（2*N）
 		'''
 		R_N = np.array([arr.sum(axis=1)])
 		C_N = np.array([arr.sum(axis=0)])
@@ -248,13 +249,13 @@ class preprocessing:
 		purpose:
 			对某个字段进行分析分箱
 		input:  
-			col: pandas series
-			method: 分箱方法 e.g {'等频':'qcut','等宽':'wcut','自定义':'cust'}
-			bins_num: 分箱数
-			cut_point: 自定义分割点
+			col: pd.Series
+			method: string 分箱方法 e.g {'等频':'qcut','等宽':'wcut','自定义':'cust'}
+			bins_num: int 分箱数
+			cut_point: list 自定义分割点
 		output:
-			col_new: pandas Series 分箱结果,按照0～n建立索引
-			cut_points: list，分割点
+			col_new: pd.Series 分箱结果,按照0～n建立索引
+			cut_points: list 分割点
 		Notes:
 		"""
 		# 无监督分箱方法
@@ -279,15 +280,15 @@ class preprocessing:
 		purpose:
 			对某个字段进行有监督分箱
 		input:  
-			col: pandas series
-			category_type: 是否离散型变量
-			bins_num: 最大分箱数
-			threshole: 卡方阈值，如果未指定bins_num,默认使用置信度95%设置threshold;threshold 越大，分箱数越少
-			target: 有监督分箱目标
+			col: pd.Series
+			category_type: bool 是否离散型变量
+			bins_num: int 最大分箱数
+			threshole: float 卡方阈值，如果未指定bins_num,默认使用置信度95%设置threshold;threshold 越大，分箱数越少
+			target: pd.Series 有监督分箱目标
 		output:
-			col_new: pandas Series 分箱结果
-			cut_points: list，分割点（连续性变量）
-			buckets_dict：字典{'原始类别'：新类别}（离散型变量）
+			col_new: pd.Series 分箱结果
+			cut_points: list 分割点（连续性变量）
+			buckets_dict：dict 字典{'原始类别'：新类别}（离散型变量）
 		Notes:
 			如果bins_num存在，则threshold 不起作用，强制分成bins_num个箱
 			如果bins_num不存在，根据threshold进行分箱
@@ -394,12 +395,12 @@ class preprocessing:
 		purpose:
 			对离散变量已分好桶的连续型变量进行woe编码
 		input:  
-			col: pandas series
-			target: 目标
+			col: pd.Series
+			target: pd.Series 目标
 			pos_label: target中正样本标签
 		output:
-			col_new: woe编码后的新列
-			woe: woe映射关系
+			col_new: pd.Series woe编码后的新列
+			woe: dict woe映射关系
 		Notes:
 		"""
 		eps = 0.00001
@@ -426,11 +427,11 @@ class preprocessing:
 		purpose:
 			对离散变量/已分好桶的连续型变量计算iv值
 		input:  
-			col: pandas series
-			target: 目标
+			col: pd.Series
+			target: pd.Series 目标
 			pos_label: target中正样本标签
 		output:
-			iv: 该字段iv值
+			iv: float 该字段iv值
 		Notes:
 		"""
 		eps = 0.00001
@@ -460,10 +461,10 @@ class preprocessing:
 		purpose:
 			计算某个字段的vif值
 		input:  
-			df: 特征宽表 
-			subset: 目标字段列表
+			df: pd.DataFrame特征宽表 
+			subset: list 目标字段列表
 		output:
-			vif: vif值
+			vif: float vif值
 		Notes:
 		"""		
 		vif = []
@@ -479,10 +480,10 @@ class preprocessing:
 		purpose:
 			根据VIF对特征过滤，降低共线性
 		input:  
-			df: 特征宽表 
-			threshold: vif阈值
+			df: pd.DataFrame 特征宽表 
+			threshold: float vif阈值
 		output:
-			df_new: vif过滤之后的df
+			df_new: pd.DataFrame vif过滤之后的df
 		Notes:
 		"""
 		dropped = True
@@ -505,12 +506,12 @@ class preprocessing:
 		purpose:
 			根据相关系数剔除变量
 		input:  
-			df: 特征宽表 
-			threshold: 相关系数阈值
-			iv_dict: 变量iv字典
-			subset: 变量子集
+			df: pd.DataFrame 特征宽表 
+			threshold: float 相关系数阈值
+			iv_dict: dict 变量iv字典
+			subset: list 变量子集
 		output:
-			fea_tmp: 过滤之后的变量列表
+			fea_tmp: list 过滤之后的变量列表
 		Notes:
 		"""
 		if subset is None:
@@ -571,8 +572,8 @@ class afterprocessing:
 		purpose:
 			对二分类问题的结果进行检验
 		input:  
-			eval_list: 一组或多组 （y,y_hat）的元组列表 
-			legend: 每组列表的含义 
+			eval_list: list with tuples like （y,y_hat） 一组或多组 （y,y_hat）的元组列表 
+			legend: list with string每组列表的含义 
 		Notes:
 		"""
 		plt.figure(figsize=(12,12))
@@ -636,8 +637,8 @@ class afterprocessing:
 		purpose:
 			对回归问题的结果进行检验
 		input:  
-			eval_list: 一组或多组 （y,y_hat）的元组列表 
-			legend: 每组列表的含义 
+			eval_list: list of tuples like （y,y_hat） 一组或多组 （y,y_hat）的元组列表 
+			legend: list of string 每组列表的含义 
 		Notes:
 		"""
 		plt.figure()
@@ -658,13 +659,13 @@ class afterprocessing:
 		purpose:
 			对比不同标签下特征的分布差异
 		input:  
-			col: pd.Series, 特征
-			label: 标签
-			x_label: x轴标签
-			y_label: y轴标签
-			bins: 分箱数
-			merge: 是否显示在同一张图中
-			ran：数据显示范围
+			col: pd.Series 特征
+			label: pd.Series 标签
+			x_label: string x轴标签
+			y_label: string y轴标签
+			bins: int 分箱数
+			merge: bool 是否显示在同一张图中
+			ran：list/tuple 数据显示范围
 		Notes:
 		"""
 		if ran is None:
@@ -696,28 +697,104 @@ class afterprocessing:
 			plt.show()
 	
 	
-class modelfit:
-	def __init__(self,config_file)
-		self.config_file = config_file
-		
-	def model_define(self):
-		from sklearn.linear_model import LogisticRegression
-		from xgboost import XGBClassifier
-		from sklearn.ensemble import RandomForestClassifier
-		parameters = self._para_read_(self.config_file)
-		model_dict = {}
-		model_dict['LogisticRegression'] = LogisticRegression(**parameters['LogisticRegression'])
-		model_dict['XGBClassifier'] = LogisticRegression(**parameters['XGBClassifier'])
-		model_dict['RandomForestClassifier'] = LogisticRegression(**parameters['RandomForestClassifier'])
+class ModelClassifier:
+	def __init__(self,config_file):
+		"""
+		purpose:
+			建立通用模型训练代码，快速构建demo
+		input:
+			config_file: string 模型参数文件
+		"""
+		self.parameters = self._para_read_(config_file)
+		self.model_dict = self._model_define_()
 
 	def _para_read_(self,config_file):
+		"""
+		purpose:
+			读取参数文件
+		input:
+			config_file: string 参数文件路径
+		output:
+			parameters:dict 参数输出
+		"""
 		with open(config_file, encoding="utf-8") as f:
 			tmp = f.readlines()
 			tmp = [x.split("//")[0] for x in tmp]
-			json_file = json.load(''.join(tmp))
-		return model_para
+			parameters = json.loads(''.join(tmp))
+		return parameters
 
-	def fit(self,model_ls,X,y):
-		for model 
+	def _model_define_(self):
+		"""
+		purpose:
+			根据配置文件定义模型对象
+		input:
+		output:
+			model_dict: dict 模型对象字典
+		"""
+		from sklearn.linear_model import LogisticRegression
+		from xgboost import XGBClassifier
+		from sklearn.ensemble import RandomForestClassifier
+		model_dict = {}
+		model_dict['LogisticRegression'] = LogisticRegression(**self.parameters['LogisticRegression']['model_para'])
+		model_dict['XGBClassifier'] = XGBClassifier(**self.parameters['XGBClassifier']['model_para'])
+		model_dict['RandomForestClassifier'] = RandomForestClassifier(**self.parameters['RandomForestClassifier']['model_para'])
+		return model_dict
+
+	def fit(self,model_nm,X_train,y_train,eval_set = []):
+		"""
+		purpose:
+			模型训练
+		input:
+			model_nm: string 模型名字
+			X_train: pd.DataFrame 用于模型训练的特征
+			y_train: pd.Series 模型训练标签
+			eval_set: list of tuples like (y,y_hat) 验证数据集
+		output:
+			
+		"""
+		model = self.model_dict[model_nm]
+		print('start %s fitting ....'%(model_nm))
+		if model_nm in ('LogisticRegression','RandomForestClassifier'):		
+			model.fit(X = X_train,y=y_train,**self.parameters[model_nm]['fit_para'])
+		elif  model_nm =='XGBClassifier':
+			model.fit(X = X_train,y=y_train,eval_set=eval_set,**self.parameters[model_nm]['fit_para'])
+		print('%s fitting finished '%(model_nm))
+
+	def grid_search(self,model_nm,X_train,y_train,parameters,cv):
+		"""
+		purpose:
+			模型参数网格搜索
+		input:
+			model_nm: string 模型名字
+			X_train: pd.DataFrame 用于模型训练的特征
+			y_train: pd.Series 模型训练标签
+			parameters: dict of parameter list 用于网格搜索的参数列表
+			cv: int k-fold number
+		output:
+			gs:GridSearchCV 网格搜索后重新fit的最优模型
+		"""
+		model = self.model_dict[model_nm]	
+		print('start %s grid searching ....'%(model_nm))
+		gs = GridSearchCV(model,parameters,cv=cv)
+		gs.fit(X_train,y_train)
+		print('%s grid searching finished '%(model_nm))
+		print('best params are %s:' %(gs.best_params_))
+		self.model_dict[model_nm] = gs.best_estimator_
+		print('model_dict is updated')
+		return gs
+	
+	def predict_prob(self,model_nm,X):
+		"""
+		purpose:
+			模型预测
+		input:
+			model_nm: string 模型名字
+			X: pd.DataFrame/np.array 特征
+		output:
+			result: np.array 模型预测结果
+		"""
+		model = self.model_dict[model_nm]
+		result = model.predict_proba(X)[:,1]
+		return result
 
 	
