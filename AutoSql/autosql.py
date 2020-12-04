@@ -1,6 +1,4 @@
 from collections import Counter
-
-
 class AutosqlFlowTable():
     """
     流水数据脚本自动化生成
@@ -14,14 +12,20 @@ class AutosqlFlowTable():
         """
         self.basic_param = basic_param
         self.basic_columns = self._get_basic_col_()
-        self.fun_dict = fun_dict
-        self.winpos_col = [x[0] for x in basic_param['winpos_col']]
+        self.fun_dict = self.__getfundict__(fun_dict)
+        self.winpos_col = [x[0].upper() for x in basic_param['winpos_col']]
+
+    def __getfundict__(self,fun_dict):
+        fun_dict_new = {}
+        for i in fun_dict.keys():
+            fun_dict_new[i.upper()] = fun_dict[i]
+        return fun_dict_new
 
     def _get_basic_col_(self):
         col_ls = []
         for i in ['entitys','dimensions','extra_col','partitioned_by']:
             for col in self.basic_param[i]:
-                    col_ls.append(col[0])
+                    col_ls.append(col[0].upper())
         col_ls = list(set(col_ls))
         return col_ls
 
@@ -37,11 +41,17 @@ class AutosqlFlowTable():
         if condition_cols:
             col_nm = condition_cols[0][0]
             for i,v in enumerate(condition_cols[0][1]):
-                if col_nm in self.winpos_col:
-                    tmp = '('+v.replace('COL',col_nm+'_'+window)+')'
+                if col_nm.upper() in self.winpos_col:
+                    tmp = '('+v[0].replace('COL',col_nm+'_'+window)+')'
                 else:
-                    tmp = '('+v.replace('COL',col_nm)+')'
-                self._condition_combine_(res,(condition[0]+' and '+tmp,condition[1]+'_'+col_nm+str(i)),condition_cols[1:],window)
+                    tmp = '('+v[0].replace('COL',col_nm)+')'
+                self._condition_combine_(res,
+                                        (condition[0]+' and '+tmp,
+                                        condition[1]+'__'+v[2],
+                                        condition[2]+'|'+v[1]
+                                        ),
+                                        condition_cols[1:],
+                                        window)
         else:
             res.append(condition)
 
@@ -56,13 +66,12 @@ class AutosqlFlowTable():
         """
 
         # 检查字段是否存在
-        for i in [x[0] for x in config['condition_cols']]+config['objects']:
-            if i not in self.basic_columns and i not in self.winpos_col:
-                print("columns %s not matched"%(i))
-                return
+        for i in [x[0] for x in config['condition_cols']]+[x for x in config['objects']]:
+            if i.upper() not in self.basic_columns and i.upper() not in self.winpos_col:
+                raise ValueError("columns %s not matched with base table"%(i))
 
         condition_ls = []
-        self._condition_combine_(condition_ls,('',''),config['condition_cols'],window)
+        self._condition_combine_(condition_ls,('','',''),config['condition_cols'],window)
         
         max_len = max([len("case when %s then  else null end"%(x[0][5:])) for x in condition_ls])+max([len(x) for x in config['objects']])
 
@@ -70,27 +79,84 @@ class AutosqlFlowTable():
         # 生成特征脚本
         fea_num = 0
         col_ls = []
-        for obj in config['objects']:
+        for obj in (x for x in config['objects']):
             for condition in condition_ls:
-                for fun_nm in config['function']:
+                for fun_nm in [x for x in config['function']]:
                     fun = self.fun_dict[fun_nm]
-
-                    col_new = config['tag']+'_'+fun_nm+'_'+obj+condition[1]
-                    tmp = "{:%s}"%(max([60,len(col_new)]))
+                    col_new = config['tag']+'__'+fun_nm+'__'+obj+condition[1]
+                    tmp = "{:%s}"%(max([80,len(col_new)]))
                     col_new = tmp.format(col_new)
 
-                    casewhen = "{:%s}"%(max([120,max_len]))
+                    casewhen = "{:%s}"%(max([200,max_len]))
                     casewhen = casewhen.format("case when %s then %s else null end"%(condition[0][5:],obj))
                     casewhen = fun.replace('COL',casewhen)
-                    sql_command.append(",%s as %s  --%s\n"%(casewhen,col_new,config['comment']))
+
+                    comment = obj+'|'+fun_nm+'|$'+condition[2]
+                    sql_command.append(",%s as %s   --%s\n"%(casewhen,col_new,comment))#config['comment']))
                     fea_num+=1
                     col_ls.append(col_new)
         
         if len(set(col_ls))!=len(col_ls):
-            print('column name duplicated,please check')
-            return
+            raise ValueError('column name duplicated,please check')
         else:
             return sql_command,col_ls
+
+
+    def __ReadConfig__(self,file):
+        """
+        purpose:
+            从excel文件中读取特征配置信息
+        input: 
+            file: string excel 文件路径
+        output:
+            config_list: list 配置字典列表
+        """
+
+        # 读取excel 文件
+        import xlrd
+        import numpy as np
+        data= xlrd.open_workbook(file)
+        data = data.sheet_by_index(0)
+        table = [['' for i in range(5)] for i in range(data.nrows)]
+        for i in range(5):
+            for j in range(data.nrows):
+                table[j][i] = data.cell(j,i).value.strip().upper()
+        table = [x for x in table if sum([len(i) for i in x])!=0]
+
+        # 空值向下填充方便后续操作
+        for i in range(2):
+            r = 0
+            while r<len(table):
+                if table[r][i]=='':
+                    table[r][i]=table[r-1][i]
+                r+=1
+        config_orig = []
+        i=0
+        j=1
+        while i<len(table) and j<len(table):
+            while j<len(table) and table[j][0].upper()!='TAG':
+                j+=1
+            config_orig.append(table[i:j])
+            i=j
+            j=i+1
+
+        # 配置解析
+        config = {}
+        config_list = []
+        for config_tmp in config_orig:
+            config = {'objects':[],'function':[],'condition_cols':[]}
+            config_tmp = np.array(config_tmp)
+            config['objects'] = list(config_tmp[config_tmp[:,0]=='OBJECTS',1])
+            config['function'] = list(config_tmp[config_tmp[:,0]=='FUNCTION',1])
+            config['tag'] = config_tmp[config_tmp[:,0]=='TAG',1][0]
+            config['comment'] = config_tmp[config_tmp[:,0]=='COMMENT',1][0]
+            cols = config_tmp[config_tmp[:,0]=='CONDITION_COLS',1]
+            for col in set(cols):
+                tmp = (col,[tuple(x) for x in config_tmp[(config_tmp[:,1]==col) &(config_tmp[:,0]=='CONDITION_COLS'),:][:,[2,3,4]]])
+                config['condition_cols'].append(tmp)
+            config_list.append(config.copy())
+        return config_list
+
 
     def BaseTableCreate(self):
         """
@@ -159,20 +225,21 @@ class AutosqlFlowTable():
         purpose:
             特征构建sql脚本自动生成
         input:
-            config_ls: list of dict 特征构建参数
-            entity: string 分析实体
+            config_ls: list of dict 特征构建参数|excel 格式文件
+            entity: list 分析实体
             window: string 窗口选择
         output:
             sql_command: str sql 脚本
         """
-        if window not in self.basic_param['win_nm']:
-            print('window %s not matched'%(window))
-            return
+        if type(config_ls)==str:
+            config_ls = self.__ReadConfig__(config_ls)
 
+        if window not in self.basic_param['win_nm']:
+            raise ValueError('window %s not matched with base table'%(window))
 
         sql_command = []
         sql_command.append("select\n")
-        sql_command.append("%s\n"%(entity))
+        sql_command.append("%s\n"%(','.join(entity)))
 
 
         col_ls = []
@@ -186,7 +253,7 @@ class AutosqlFlowTable():
 
         # from table group by col
         sql_command.append("from %s.%s\n"%(self.basic_param['database'],self.basic_param['table'][0]))
-        sql_command.append("group by %s\n"%(entity))
+        sql_command.append("group by %s\n"%(','.join(entity)))
         sql_command.append(";\n\n\n\n")
 
         sql_command = ''.join(sql_command)
@@ -233,10 +300,6 @@ class AutosqlFlowTable():
         return sql_command
 
 
-
-
-
-
 class AutosqlSnapshotTable():
     """
     快照数据自动化特征脚本生成
@@ -249,8 +312,14 @@ class AutosqlSnapshotTable():
         """
         self.basic_param = basic_param
         self.basic_columns = self._get_basic_col_()
-        self.fun_dict = fun_dict
+        self.fun_dict = self.__getfundict__(fun_dict)
         self.winpos_col = [x[0] for x in basic_param['winpos_col']]
+
+    def __getfundict__(self,fun_dict):
+        fun_dict_new = {}
+        for i in fun_dict.keys:
+            fun_dict_new[i.upper()] = fun_dict[i]
+        return fun_dict_new
 
     def _get_basic_col_(self):
         col_ls = []

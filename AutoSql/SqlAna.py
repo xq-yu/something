@@ -96,31 +96,31 @@ def cypher_command(relation_pair,project_tag=None):
     return cypher
 
 
+if __name__ == '__main__':
+    # 1.读取sql脚本
+    with open('./test.sql') as f:
+        relation = []
+        # 多条sql语句分解
+        sql_ls = sqlparse.split(''.join(f.readlines()))
+        for sql in sql_ls:
+            relation.append(extract_table_depend(sql)) 
 
-# 1.读取sql脚本
-with open('./test.sql') as f:
-    relation = []
-    # 多条sql语句分解
-    sql_ls = sqlparse.split(''.join(f.readlines()))
-    for sql in sql_ls:
-        relation.append(extract_table_depend(sql)) 
+    # 2.定义关系对
+    relation_pair = []
+    for i in relation:
+        if i[0] is not None:
+            for j in i[1]:
+                relation_pair.append((j.lower(), i[0].lower()))
+    relation_pair=set(relation_pair)
 
-# 2.定义关系对
-relation_pair = []
-for i in relation:
-    if i[0] is not None:
-        for j in i[1]:
-            relation_pair.append((j.lower(), i[0].lower()))
-relation_pair=set(relation_pair)
-
-# 3.生成网络
-cypher = cypher_command(relation_pair,project_tag='table_relation')
-graph = Graph('http://localhost:7474',username='neo4j',password='myneo4j')
-graph.run(cypher)
+    # 3.生成网络
+    cypher = cypher_command(relation_pair,project_tag='table_relation')
+    graph = Graph('http://localhost:7474',username='neo4j',password='myneo4j')
+    graph.run(cypher)
 
 
-# 4.删除节点
-graph.run("match (n) where n.project_tag='table_relation' detach delete n return 'finished'")
+    # 4.删除节点
+    graph.run("match (n) where n.project_tag='table_relation' detach delete n return 'finished'")
 
 
 

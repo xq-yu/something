@@ -7,6 +7,7 @@ from scipy.stats import chi2
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import seaborn as sns
 import json
+
 class preprocessing:
 	def missing_cal(self, df):
 		"""
@@ -590,7 +591,6 @@ class afterprocessing:
 		#plt.grid()
 		plt.title('ROC_curve')
 		
-		
 		# KS
 		plt.subplot(2,2,2)
 		for i, eval_set in enumerate(eval_list):
@@ -643,24 +643,25 @@ class afterprocessing:
 		"""
 		plt.figure()
 		for i,eval_set in enumerate(eval_list):
-			print(legend[i]+' corr: '+str(eval_set[0].corr(eval_set[1])))
+			#print(legend[i]+' corr: '+str(eval_set[0].corr(eval_set[1])))
 			print(legend[i]+' r2: '+str(metrics.r2_score(eval_set[0],eval_set[1])))
 			print(legend[i]+' mae: '+str(metrics.mean_absolute_error(eval_set[0],eval_set[1])))
 			print(legend[i]+' mse: '+str(metrics.mean_squared_error(eval_set[0],eval_set[1])))
-			plt.plot(eval_set[0],eval_set[1],label = legend[i])
+			plt.plot(eval_set[0],eval_set[1],'.',label = legend[i])
 			plt.xlabel('y')
 			plt.ylabel('y_hat')
 			plt.grid()
 			plt.legend()
 			plt.show()		
 	
-	def cols_compare(self,col,label,x_label = None,y_label = None, bins = 50,merge=True,ran=None):
+	def cols_compare(self,col,label,category_type=False,x_label = None,y_label = None, bins = 50,ran=None):
 		"""
 		purpose:
 			对比不同标签下特征的分布差异
 		input:  
 			col: pd.Series 特征
 			label: pd.Series 标签
+			category_type: bool 是否为类别型变量
 			x_label: string x轴标签
 			y_label: string y轴标签
 			bins: int 分箱数
@@ -668,47 +669,300 @@ class afterprocessing:
 			ran：list/tuple 数据显示范围
 		Notes:
 		"""
-		if ran is None:
-			median = col.quantile(q = 0.5)
-			p75 = col.quantile(q = 0.75)
-			p25 = col.quantile(q = 0.25)
-			IQR = p75-p25
-			ran_left = max((p25-3*IQR),min(col))
-			ran_right = min((p75+3*IQR),max(col))
-			ran = (ran_left,ran_right)
+
+		# 对于数值型特征，限制左右边界，去掉异常值的影响
+		if (not category_type) and (ran is None):
+			ran_left = []
+			ran_right=  []
+			for i,tag in enumerate(label.unique()):
+				col_tmp = col.loc[label==tag]
+				median = col.quantile(q = 0.5)
+				p75 = col_tmp.quantile(q = 0.75)
+				p25 = col_tmp.quantile(q = 0.25)
+				IQR = p75-p25
+				ran_left.append(max((p25-3*IQR),min(col)))
+				ran_right.append(min((p75+3*IQR),max(col)))
+			ran = (min(ran_left),max(ran_right))
 		
-		tmp = (ran[1]-ran[0])/bins
-		cutpoint = [ran[0]+x*tmp for x in range(bins+1)]
-		col = col.loc[(col>=ran[0]) & (col<=ran[1])]
-		if merge:
-			for tag in label.unique():
-				sns.distplot(col.loc[label==tag],bins = cutpoint,kde_kws={'label':tag})
-			plt.legend()
-			plt.xlabel(x_label) 
-			plt.ylabel(y_label)
-			plt.show()
+		plt.figure()
+		if not category_type:
+			for i,tag in enumerate(label.unique()):
+				col_tmp = col.loc[label==tag]
+				plt.hist(col_tmp,range = ran, density = False,bins = bins,alpha = 0.5,label = tag,weights = [1/len(col_tmp)]*len(col_tmp))
 		else:
 			for i,tag in enumerate(label.unique()):
-				plt.subplot(len(label.unique()),1,i+1)
-				plt.hist(col.loc[label==tag],range = ran, density = False,bins = bins,alpha = 0.5,label = tag)
-				plt.legend()
-				plt.ylabel(y_label)
-			plt.xlabel(x_label) 
-			plt.show()
-	
-	
-class ModelClassifier:
-	def __init__(self,config_file):
+				col_tmp = col.loc[label==tag]
+				tmp = col_tmp.groupby(col_tmp).count()/len(col_tmp)
+				plt.bar(tmp.index,tmp,label = tag)
+		plt.legend()
+		plt.ylabel(y_label)
+		plt.xlabel(x_label) 
+		plt.show()
+
+	def TreeExport(self,decision_tree,max_depth,feature_names=None):
+		"""
+		purpose:
+			单棵决策树规则提取
+		input：
+			decision_tree: sklearn.tree.DecisionTreeClassifier 决策树模型
+			max_depth: 规则提取深度
+			feature_names: 特征名称
+		output: 
+			res:pd.DataFrame,{'路径规则'，'训练集样本','精度'，'召回率'}
+		"""
+		
+		from sklearn.tree import export_text
+		import re
+
+		tree = export_text(decision_tree=decision_tree,
+						max_depth=decision_tree.max_depth,
+						feature_names=feature_names,
+						show_weights=True,
+						decimals=2).split('\n')
+		tree = [x for x in tree if len(x)>0]
+		
+		def getrules(tree,con_list,con_cur,depth_cur,max_depth):
+			if len(tree)==1:
+				samplecnt = eval(re.findall(r"\[.+?\]",tree[0][4:])[0])
+				con_list.append((con_cur,samplecnt))
+				return
+			elif depth_cur==max_depth:
+				leafs = [x for x in tree if 'weights' in x]
+				leafs = [eval(re.findall(r"\[.+?\]",x)[0]) for x in leafs]
+				samplecnt = list(sum(np.array(leafs)))
+				con_list.append((con_cur,samplecnt))
+				return
+			
+			root_index = [i for i in range(len(tree)) if tree[i][0:4]=='|---']
+			root_index.append(len(tree))
+			
+			for i in range(len(root_index)-1):
+				subtree = [row[4:] for row in tree[root_index[i]+1:root_index[i+1]]]
+				getrules(subtree,con_list,con_cur+('|'+tree[root_index[i]][4:]),depth_cur+1,max_depth)
+
+		con_list = []
+		con_cur = ''
+		depth_cur = 0
+		getrules(tree,con_list,con_cur,depth_cur,max_depth)
+
+		res = pd.DataFrame({'condition':[x[0] for x in con_list],
+							'samplecnt':[x[1] for x in con_list]})
+		res['precision'] = res.samplecnt.map(lambda x: list(np.array(x)/sum(x)))
+		sample_sum = sum(np.array(list(res.samplecnt)))
+		res['recall'] = res.samplecnt.map(lambda x: list(x/sample_sum))
+		return res
+
+	def ForestExport(self,random_forest,max_depth,feature_names=None):
+		"""
+		purpose:
+			随机森林规则提取
+		input：
+			random_forest: sklearn.ensemble.RandomForestClassifier 决策树模型
+			max_depth: 规则提取深度
+			feature_names: 特征名称
+		output: 
+			res:pd.DataFrame,{'路径规则'，'训练集样本','精度'，'召回率'}
+		"""
+		for i,decision_tree in enumerate(random_forest.estimators_):
+			if i==0:
+				res = self.TreeExport(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)
+			else:
+				res = pd.concat([res,self.TreeExport(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)])
+		
+		res = res.drop_duplicates(subset = 'condition')
+
+		return res
+
+
+	def TreePrint(self,decision_tree,max_depth,feature_names=None):
+		"""
+		purpose:
+			单棵决策树结构打印
+		input：
+			decision_tree: sklearn.tree.DecisionTreeClassifier 决策树模型
+			max_depth: 规则提取深度
+			feature_names: 特征名称
+		output: 
+			tree_struct:string,树结构
+		"""
+		from sklearn.tree import export_text
+		import re
+
+		tree = export_text(decision_tree=decision_tree,
+						max_depth=decision_tree.max_depth,
+						feature_names=feature_names,
+						show_weights=True,
+						decimals=2).split('\n')
+		tree = [x for x in tree if len(x)>0]
+
+
+		def treeprint(tree,judge,depth_cur,max_depth):
+			if len(tree)==1:  #如果到达叶节点
+				leaf = str(list(np.array(eval(re.findall(r"\[.+?\]",tree[0][4:])[0].replace(' ',''))).astype(np.int)))
+				lineformat = "{:^%s}"%(len(leaf))
+				line = lineformat.format('|')
+				return [line,line,lineformat.format(judge),leaf]
+			elif depth_cur==max_depth:  #如果达到最大深度
+				# 结算子树所有叶节点样本总和
+				leafs = [x for x in tree if 'weights' in x]
+				leafs = [eval(re.findall(r"\[.+?\]",x)[0]) for x in leafs]
+				leaf = str(list(sum(np.array(leafs)).astype(np.int)))
+				lineformat = "{:^%s}"%(len(leaf))
+				line = lineformat.format('|')
+				return [line,line,lineformat.format(judge),leaf]
+			
+			#抓取根节点索引
+			root_index = [i for i in range(len(tree)) if tree[i][0:4]=='|---']
+			root_index.append(len(tree))
+			
+			#获取根节点
+			root = '{'+tree[root_index[0]][4:].replace(' ','')+'}'
+			
+			#左树
+			subtree_left = [row[4:] for row in tree[root_index[0]+1:root_index[1]]]
+			subtopo_left = treeprint(subtree_left,'YES',depth_cur+1,max_depth=max_depth)
+
+			#右树
+			subtree_right = [row[4:] for row in tree[root_index[1]+1:root_index[2]]]
+			subtopo_right= treeprint(subtree_right,'NO',depth_cur+1,max_depth=max_depth)
+
+			#左右子树合并
+			subtopo = []
+			diff = len(subtopo_left)-len(subtopo_right)
+			if diff<0:
+				tmp = max([len(x) for x in subtopo_left])
+				subtopo_left = subtopo_left+[' '*tmp]*(-diff)
+			elif diff>0:
+				tmp = max([len(x) for x in subtopo_right])
+				subtopo_right = subtopo_right+[' '*tmp]*(diff)			
+			for i in range(len(subtopo_left)):
+				subtopo.append(subtopo_left[i]+' '+subtopo_right[i])
+
+			samplecnt = str(list(sum(np.array([eval(x) for x in re.findall("\[.+?\]",subtopo[3])])))) # 根节点样本数
+			L = max([len(subtopo[0].strip()),len(root),len(samplecnt)])
+			
+			nodeformat = "{:-^%s}"%(L)
+			lineformat = "{:^%s}"%(L)
+
+			gap = (subtopo[0].find('|')-(L-len(subtopo[0].strip()))//2)*' '
+			line =  gap+lineformat.format('|')
+			judge = gap+lineformat.format(judge)
+			samplecnt = gap+lineformat.format(samplecnt)
+			root = gap+nodeformat.format(root)
+			res = [line,line,judge,samplecnt,line,line,root]+subtopo
+			L = max([len(x) for x in res])
+			tmp = "{:<%s}"%(L)
+			res = [tmp.format(x) for x in res]
+			return res
+
+		tree_struct = '\n'.join(treeprint(tree,judge='|',depth_cur=0,max_depth=max_depth))
+		tree_struct = tree_struct.replace('[','(').replace(']',')')
+		return tree_struct
+
+	############################
+	#通过解析pmml文件方式提取规则路径
+	############################
+	# def PmmlTreeDraw(self,node_list,con,con_list):
+	# 	"""
+	# 	purpose:
+	# 		pmml单棵决策树规则提取
+	# 	input：
+	# 		node_list: 某一层的节点列表
+	# 		con：通往该层的前置条件
+	# 		con_list: 路径存储列表
+	# 	"""
+	# 	#如果没有节点
+	# 	if len(node_list)==0:
+	# 		con_list.append(con)
+	# 	#如果存在节点
+	# 	else:
+	# 		#取出第一个节点
+	# 		node_0 = node_list[0] 
+	# 		child_nodes = [k for k in node_0.childNodes if k.localName=='Node']
+	# 		con_0 = ''
+	# 		if [k for k in node_0.childNodes if k.localName=='SimplePredicate']!=[]:
+	# 			con_0=node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('field')+' '+ \
+	# 						node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('operator') + ' ' +\
+	# 						node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('value')
+	# 			con_1=node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('field')+' '+ \
+	# 						'not '+\
+	# 						node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('operator') + ' ' +\
+	# 						node_list[0].getElementsByTagName('SimplePredicate')[0].getAttribute('value')
+	# 		else:
+	# 			con_0 = ''
+	# 		# 判断该节点是否是叶节点
+	# 		if child_nodes==[]:
+	# 			#计算样本分布
+	# 			cnt = {}
+	# 			for i in [k for k in node_0.childNodes if k.localName=='ScoreDistribution']:
+	# 				cnt[i.getAttribute('value')] = i.getAttribute('recordCount')
+	# 			con_0 = con_0+'|'+str(cnt)
+	# 		self.PmmlTreeDraw([],con+'|'+con_0,con_list)
+	# 		# 处理剩余节点
+	# 		if len(node_list)>1:
+	# 			self.PmmlTreeDraw(node_list[1:],con+'|'+con_1,con_list)
+
+	# def PmmlRandomForestDraw(self,pmml_file):
+	# 	"""
+	# 	purpose:
+	# 		pmml随机森林规则提取
+	# 	input：
+	# 		pmml_file: string 随机森林pmml文件路径
+	# 	output:
+	# 		res: pd.DataFrame 叶节点的样本数与通往该叶节点的规则路径
+	# 	"""
+	# 	import xml.dom.minidom as xmldom
+	# 	# 一个segment对应一棵树
+	# 	domobj=xmldom.parse(pmml_file)
+	# 	elementobj=domobj.documentElement
+	# 	segments=elementobj.getElementsByTagName('Segment')
+
+	# 	con_list = []
+	# 	for tree in  segments:
+	# 		con_list_tmp = []
+	# 		#获取第一层节点列表
+	# 		node_list = [k for k in tree.getElementsByTagName('Node')[0].childNodes if k.localName=='Node' ]
+	# 		self.PmmlTreeDraw(node_list,'',con_list_tmp)
+	# 		con_list = con_list+con_list_tmp
+
+	# 	# pmml 中判断关键字
+	# 	operator = {
+	# 	'not lessOrEqual':'>',
+	# 	'not greaterThan':'<=',
+	# 	'not equal':'!=',
+	# 	'lessOrEqual':'<=',
+	# 	'greaterThan':'>',
+	# 	'equal':'=='
+	# 	}
+
+	# 	# 决策路径整理
+	# 	condition = ['|'.join(con.split('|')[0:-1]) for con in con_list]
+	# 	res = pd.DataFrame([eval(con.split('|')[-1]) for con in con_list ])
+	# 	res['condition'] = condition
+	# 	res = res.drop_duplicates(subset='condition')
+	# 	for key in operator.keys():
+	# 		res['condition'] = res['condition'].str.replace(key,operator[key])
+	# 	return res
+
+
+class Modelset:
+	def __init__(self,config_file,type):
 		"""
 		purpose:
 			建立通用模型训练代码，快速构建demo
 		input:
 			config_file: string 模型参数文件
+			type: string 模型类型，分类or回归 ('classifier','regressor')
 		"""
-		self.parameters = self._para_read_(config_file)
-		self.model_dict = self._model_define_()
+		self.parameters = self._paramread_(config_file)
+		self.type = type
+		if type == 'classifier':		
+			self.model_dict = self._classifierdefine_()
+		elif type == 'regressor':
+			self.model_dict = self._regressordefine_()
 
-	def _para_read_(self,config_file):
+
+	def _paramread_(self,config_file):
 		"""
 		purpose:
 			读取参数文件
@@ -723,10 +977,11 @@ class ModelClassifier:
 			parameters = json.loads(''.join(tmp))
 		return parameters
 
-	def _model_define_(self):
+
+	def _classifierdefine_(self):
 		"""
 		purpose:
-			根据配置文件定义模型对象
+			根据配置文件定义分类模型对象
 		input:
 		output:
 			model_dict: dict 模型对象字典
@@ -739,6 +994,26 @@ class ModelClassifier:
 		model_dict['XGBClassifier'] = XGBClassifier(**self.parameters['XGBClassifier']['model_para'])
 		model_dict['RandomForestClassifier'] = RandomForestClassifier(**self.parameters['RandomForestClassifier']['model_para'])
 		return model_dict
+
+
+	def _regressordefine_(self):
+		"""
+		purpose:
+			根据配置文件定义回归模型对象
+		input:
+		output:
+			model_dict: dict 模型对象字典
+		"""
+		from sklearn.linear_model import Lasso,Ridge
+		from xgboost import XGBRegressor
+		from sklearn.ensemble import RandomForestRegressor
+		model_dict = {}	
+		model_dict['Lasso'] = Lasso(**self.parameters['Lasso']['model_para'])
+		model_dict['Ridge'] = Ridge(**self.parameters['Ridge']['model_para'])
+		model_dict['XGBRegressor'] = XGBRegressor(**self.parameters['XGBRegressor']['model_para'])
+		model_dict['RandomForestRegressor'] = RandomForestRegressor(**self.parameters['RandomForestRegressor']['model_para'])
+		return model_dict
+
 
 	def fit(self,model_nm,X_train,y_train,eval_set = []):
 		"""
@@ -754,11 +1029,21 @@ class ModelClassifier:
 		"""
 		model = self.model_dict[model_nm]
 		print('start %s fitting ....'%(model_nm))
-		if model_nm in ('LogisticRegression','RandomForestClassifier'):		
-			model.fit(X = X_train,y=y_train,**self.parameters[model_nm]['fit_para'])
-		elif  model_nm =='XGBClassifier':
-			model.fit(X = X_train,y=y_train,eval_set=eval_set,**self.parameters[model_nm]['fit_para'])
-		print('%s fitting finished '%(model_nm))
+
+
+		if self.type == 'classifier':
+			if model_nm in ('LogisticRegression','RandomForestClassifier'):		
+				model.fit(X = X_train,y=y_train,**self.parameters[model_nm]['fit_para'])
+			elif  model_nm =='XGBClassifier':
+				model.fit(X = X_train,y=y_train,eval_set=eval_set,**self.parameters[model_nm]['fit_para'])
+			print('%s fitting finished '%(model_nm))
+		elif self.type == 'regressor':
+			if model_nm in ('Lasso', 'Ridge', 'RandomForestRegressor'):		
+				model.fit(X = X_train,y=y_train,**self.parameters[model_nm]['fit_para'])
+			elif  model_nm =='XGBRegressor':
+				model.fit(X = X_train,y=y_train,eval_set=eval_set,**self.parameters[model_nm]['fit_para'])
+			print('%s fitting finished '%(model_nm))
+
 
 	def grid_search(self,model_nm,X_train,y_train,parameters,cv):
 		"""
@@ -783,7 +1068,8 @@ class ModelClassifier:
 		print('model_dict is updated')
 		return gs
 	
-	def predict_prob(self,model_nm,X):
+
+	def predict(self,model_nm,X):
 		"""
 		purpose:
 			模型预测
@@ -794,7 +1080,75 @@ class ModelClassifier:
 			result: np.array 模型预测结果
 		"""
 		model = self.model_dict[model_nm]
-		result = model.predict_proba(X)[:,1]
-		return result
+		if self.type=='classifier':
+			result = model.predict_proba(X)[:,1]
+			return result
+		elif self.type=='regressor':
+			result = model.predict(X)
+			return result
 
-	
+
+
+class BetterTreeClassifier:
+	"""
+	每次选取最优路径，对剩余路径下的样本重新建模，通过多次迭代生成分类树模型
+	input:
+		max_depth:int 树深度
+		fit_rounds:int 迭代次数
+	"""
+	def __init__(self,max_depth,fit_rounds):
+		from sklearn.tree import DecisionTreeClassifier
+		self.max_depth = max_depth
+		self.fit_rounds = fit_rounds
+		self.tree = DecisionTreeClassifier(max_depth=max_depth)
+
+	def __getrules__(self,X,y):
+		self.tree.fit(X,y)
+
+		aftmethod = afterprocessing()
+		res = aftmethod.TreeExport(self.tree,max_depth=self.tree.max_depth)
+		
+		return res[['condition','samplecnt','precision','recall']]
+
+	def __exec_rule__(self,rule,X):
+		X.columns = ['feature_'+str(i) for i in range(X.shape[1])]
+		tmp = '&'.join(['(X.%s)'%(x.replace(' ','')) for x in rule.split('|') if len(x)>0])
+		return eval(tmp)
+
+	def fit(self,X,y):	
+		rule_final = []
+		precision_final = []
+		samplecnt_final = []
+		data_tmp = pd.concat([X,y],axis=1)
+		for i in range(self.fit_rounds):	
+			X_tmp = data_tmp.iloc[:,0:-1]
+			y_tmp = pd.Series(list(data_tmp.iloc[:,-1]))
+			res = self.__getrules__(X_tmp,y_tmp)
+			res['pos_score'] = res.precision.map(lambda x:x[1])
+			res = res.sort_values('pos_score',ascending=False)
+			rule_final.append(res.iloc[0,0])
+			samplecnt_final.append(res.iloc[0,1])
+			precision_final.append(res.iloc[0,2])
+			data_tmp = data_tmp[(~self.__exec_rule__(res.iloc[0,0],data_tmp))]
+
+		rule_final = rule_final+list(res.iloc[1:,0])
+		samplecnt_final = samplecnt_final+list(res.iloc[1:,1])
+		precision_final = precision_final+list(res.iloc[1:,2])
+		self.rules = pd.DataFrame({'condition':rule_final,'samplecnt':samplecnt_final,'precision':precision_final})
+
+		tmp  = sum(np.array(list(self.rules.samplecnt)))
+		self.rules['recall'] = self.rules.samplecnt.map(lambda x: list(np.array(x)/tmp))
+
+	def __predict_row__(self,row):
+		i=0
+		while self.__exec_rule__(self.rules.iloc[i,0],row)==False:
+			i+=1
+		return self.rules.iloc[i,1]
+
+	def predict(self,X):
+		res = np.array([[-1.0,-1.0]]*len(X))
+		for i in self.rules.index:
+			rule = self.rules.loc[i,'condition']
+			score = self.rules.loc[i,'precision']
+			res[(res[:,0]==-1)&self.__exec_rule__(rule,X),:]=score
+		return res
