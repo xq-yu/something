@@ -1,0 +1,114 @@
+{
+    "RandomForestRegressor":
+    {
+        "model_para":
+        {
+            "n_estimators":100,                               //树棵数  The number of trees in the forest
+            "criterion":"mse",                               //判断方法  The function to measure the quality of a split
+            "max_depth":5,                                     //最大树深  The maximum depth of the tree
+            "min_samples_split":2,                                //节点分裂样本数阈值  The minimum number of samples required to split an internal node
+            "min_samples_leaf":1,                                  //叶节点最小样本数 The minimum number of samples required to be at a leaf node
+            "min_weight_fraction_leaf":0.0,                  //The minimum weighted fraction of the sum total of weights (of all the input samples) required to be at a leaf node.
+            "max_features":"auto",                          //分裂时特征采样方法  The number of features to consider when looking for the best split
+            "max_leaf_nodes":null,                    //row trees with ``max_leaf_nodes`` in best-first fashion.  
+            "min_impurity_decrease":0.0,                //节点分裂损失减小阈值 A node will be split if this split induces a decrease of the impurity greater than or equal to this value.
+            "min_impurity_split":null,                    //Threshold for early stopping in tree growth. 
+            "bootstrap":true,                             //Whether bootstrap samples are used when building trees. 
+            "oob_score":false,                            //Whether to use out-of-bag samples to estimate the generalization accuracy.
+            "n_jobs":-1,                                    //并行线程数量 The number of jobs to run in parallel
+            "random_state":233,                         //随机种子
+            "verbose":0,                                      //Controls the verbosity when fitting and predicting.
+            "warm_start":false                      //reuse the solution of the previous call to fit and add more estimators to the ensemble
+        },
+        "fit_para":
+        {
+        }
+    }
+,
+
+    "XGBRegressor":
+    {
+        "model_para":
+        {
+            "n_estimators": 100,
+            "max_depth" : 5,                            //最大树深 Maximum tree depth for base learners.
+            "learning_rate" : 0.1,                      //学习率 Boosting learning rate (xgb's "eta")
+            "verbosity" : 0,                            //The degree of verbosity. Valid values are 0 (silent) - 3 (debug).
+            "objective" :"reg:squarederror",             //优化函数 Specify the learning task and the corresponding learning objective or a custom objective function to be used (see note below).
+            "booster": "gbtree",                        //基学习器  Specify which booster to use: gbtree, gblinear or dart.
+            "tree_method": "exact",                     //Specify which tree method to use.  Default to auto.  If this paramete is set to default, XGBoost will choose the most conservative option available.  It's recommended to study this option from parameters document.
+            "n_jobs" : -1,                           //并行线程数 Number of parallel threads used to run xgboost.
+            "gamma" : 0,                                //进一步分裂的损失减小阈值 Minimum loss reduction required to make a further partition on a leaf node of the tree.
+            "min_child_weight" :1,                      //Minimum sum of instance weight(hessian) needed in a child.
+            "max_delta_step" :0,                        //Maximum delta step we allow each tree's weight estimation to be.
+            "subsample" :0.8,                           //每个基学习器样本采样率 Subsample ratio of the training instance.
+            "colsample_bytree" :0.8,                       //每个及学习器特征采样率 Subsample ratio of columns when constructing each tree.
+            "colsample_bylevel" :0.8,                      //每层中的特征采样率 Subsample ratio of columns for each level.
+            "colsample_bynode" :0.8,                       //每次分裂的特征采样率 Subsample ratio of columns for each split.
+            "reg_alpha" :1,                              //l1正则项，用于惩罚叶节点数量 L1 regularization term on weights
+            "reg_lambda" :1,                             //L2正则项，用于惩罚叶节点分数 regularization term on weights
+            "scale_pos_weight" :1,                       //标签权重 Balancing of positive and negative weights.
+            "base_score":0.5,                              //The initial prediction score of all instances, global bias.
+            "random_state" :233,                           //Random number seed.
+            "missing":null,                            //缺失值 Value in the data which needs to be present as a missing value.                        
+            "num_parallel_tree":1,                         //Used for boosting random forest
+            "monotone_constraints":"()",                       //Constraint of variable monotonicity
+            "interaction_constraints":"",                         //Constraints for interaction representing permitted interactions.
+            "importance_type":"gain"                    //特征重要性计算方式 The feature importance type for the feature_importances
+        },
+        "fit_para":
+        {
+            "eval_metric":"rmse",
+            "early_stopping_rounds":20
+        }
+    }
+,
+    "Lasso":
+    {
+        "model_para":
+        {
+            "alpha":1.0,                       //正则项系数
+            "fit_intercept":true,              //是否拟合偏置
+            "normalize":false,                 //是否对特征【矩阵】归一化
+            "precompute":false,                //
+            "copy_X":true,                     //是否复制特征矩阵
+            "max_iter":1000,                   //最大迭代次数
+            "tol":0.0001,                      //收敛阈值
+            "warm_start":false, 
+            "positive":false,                  //是否强制系数为正
+            "random_state":null,          
+            "selection":"cyclic"              //是否每次随机选择一个系数进行迭代
+        },
+        "fit_para":
+        {
+
+        }
+    }                          
+,
+    "Ridge":
+    {
+        "model_para":
+        {
+            "alpha":1.0,                       //正则项系数
+            "fit_intercept":true,              //是否拟合偏置
+            "normalize":false,                 //是否对特征【矩阵】归一化
+            "copy_X":true,                     //是否复制特征矩阵
+            "max_iter":1000,                   //最大迭代次数
+            "tol":0.0001,                      //收敛阈值
+            "solver":"auto", 
+            "random_state":null          
+        },
+        "fit_para":
+        {
+
+        }
+    }                          
+}
+
+
+
+                            
+
+
+
+
