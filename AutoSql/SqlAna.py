@@ -98,7 +98,7 @@ def cypher_command(relation_pair,project_tag=None):
 
 if __name__ == '__main__':
     # 1.读取sql脚本
-    with open('./test.sql') as f:
+    with open('/Users/yu/Desktop/work/unionpay/项目/电诈策略优化/total.sql') as f:
         relation = []
         # 多条sql语句分解
         sql_ls = sqlparse.split(''.join(f.readlines()))
@@ -118,6 +118,9 @@ if __name__ == '__main__':
     graph = Graph('http://localhost:7474',username='neo4j',password='myneo4j')
     graph.run(cypher)
 
+    print('cypher query:')
+    print("match (n) where n.project_tag='table_relation' return n")
+    
 
     # 4.删除节点
     graph.run("match (n) where n.project_tag='table_relation' detach delete n return 'finished'")

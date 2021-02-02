@@ -1,7 +1,6 @@
 from collections import Counter
 import xlrd
 import numpy as np
-import re
 class AutosqlFlowTable():
     """
     流水数据脚本自动化生成
@@ -18,28 +17,10 @@ class AutosqlFlowTable():
         else:
             self.basic_param = basic_param
         self.basic_columns = self._get_basic_col()
-        self.fun_dict = self._getfundict()
+        self.fun_dict = self._getfundict(fun_dict)
         self.winpos_col = [x[0].upper() for x in self.basic_param['winpos_col']]
 
-    def _getfundict(self):
-        fun_dict = {
-                'sum':      'sum              (  COL1  ) ',
-                'avg':      'avg              (  COL1  ) ',
-                'max':      'max              (  COL1  ) ',
-                'mid':      'percentile_approx(  COL1  , 0.5) ',
-                'min':      'min              (  COL1  ) ',
-                'std':      'std              (  COL1  ) ',
-                'count':    'count            (  COL1  ) ',
-                'cnt':      'count            (  COL1  ) ',
-                'cntdist':  'count(distinct   (  COL1  ))',
-                'sumabs':   'sum(abs          (  COL1  ))',
-                'maxabs':   'max(abs          (  COL1  ))',
-                'minabs':   'min(abs          (  COL1  ))',
-                'avgabs':   'avg(abs          (  COL1  ))',
-                'pctsum':   'sum              (  COL1  )/sum(COL2)',
-                'pctcnt':   'count            (  COL1  )/count(COL2)',
-                'pctcntdist':   'count(distinct   (  COL1  ))/count(distinct   (  COL2  ))'
-        }
+    def _getfundict(self,fun_dict):
         fun_dict_new = {}
         for i in fun_dict.keys():
             fun_dict_new[i.upper()] = fun_dict[i]
@@ -94,60 +75,34 @@ class AutosqlFlowTable():
                 raise ValueError("columns %s not matched with base table"%(i))
 
         condition_ls = []
-        self._condition_combine(condition_ls,('1','',''),config['condition_cols'],window)
-        max_len = max([len("case when %s then  else null end"%(x[0])) for x in condition_ls])+max([len(x) for x in config['objects']])
-
+        self._condition_combine(condition_ls,('','',''),config['condition_cols'],window)
+        
+        max_len = max([len("case when %s then  else null end"%(x[0][5:])) for x in condition_ls])+max([len(x) for x in config['objects']])
 
         sql_command = []
+        # 生成特征脚本
+        fea_num = 0
         col_ls = []
-        # 生成特征脚本-普通统计函数
-        fun_normal = [x for x in config['function'] if x[0:3]!='PCT']
-        for obj in (x for x in config['objects']):    #统计目标循环
-            for condition in condition_ls:            #条件循环
-                for fun_nm in fun_normal:  #统计函数循环
+        for obj in (x for x in config['objects']):
+            for condition in condition_ls:
+                for fun_nm in [x for x in config['function']]:
                     fun = self.fun_dict[fun_nm]
-
-                    # 格式化字段名
                     col_new = config['tag']+'__'+fun_nm+'__'+obj+condition[1]
                     tmp = "{:%s}"%(max([80,len(col_new)]))
                     col_new = tmp.format(col_new)
-                    # 注释
-                    comment = obj+'|'+fun_nm+'|$'+condition[2]
-                    # 格式化casewhen语句
                     casewhen = "{:%s}"%(max([200,max_len]))
-                    casewhen = casewhen.format("case when %s then %s else null end"%(condition[0],obj))
+                    casewhen = casewhen.format("case when %s then %s else null end"%(condition[0][5:],obj))
                     
-                    sql_cal = fun.replace('COL1',casewhen)
-                    sql_command.append(",%s as %s   --%s\n"%(sql_cal,col_new,comment))
+                    if fun_nm.upper() in ('PCTSUM','PCTCNT'):
+                        casewhen = fun.replace('COL1',casewhen).replace('COL2',obj)
+                    else:
+                        casewhen = fun.replace('COL1',casewhen)
+
+                    comment = obj+'|'+fun_nm+'|$'+condition[2]
+                    sql_command.append(",%s as %s   --%s\n"%(casewhen,col_new,comment))#config['comment']))
+                    fea_num+=1
                     col_ls.append(col_new)
-
-        # 生成特征脚本-百分比统计函数
-        fun_pct = [x for x in config['function'] if x[0:3]=='PCT']
-        for obj in (x for x in config['objects']):    #统计目标循环
-            for fun_nm in fun_pct:
-                fun = self.fun_dict[fun_nm.split('_')[0]]
-                pct_part = fun_nm.split('_')[1]  #百分比分母条件字段
-                condition_lower_ls = []
-                tmp = [x for x in config['condition_cols'] if x[0]!=pct_part]
-                self._condition_combine(condition_lower_ls,('1','',''),tmp,window)
-            
-                for condition_lower in condition_lower_ls:
-                    condition_upper_ls = []
-                    tmp = [x for x in config['condition_cols'] if x[0]==pct_part]
-                    self._condition_combine(condition_upper_ls,condition_lower,tmp,window)
-                    for condition_upper in condition_upper_ls:
-                        # 格式化字段名
-                        col_new = config['tag']+'__'+fun_nm.replace('_','')+'__'+obj+condition_upper[1]
-                        tmp = "{:%s}"%(max([80,len(col_new)]))
-                        col_new = tmp.format(col_new) 
-                        # 注释
-                        comment = obj+'|'+fun_nm+'|$'+condition_upper[2]
-
-                        casewhen_upper = "case when %s then %s else null end"%(condition_upper[0],obj)
-                        casewhen_lower = "case when %s then %s else null end"%(condition_lower[0],obj)
-                        sql_cal = fun.replace('COL1',casewhen_upper).replace('COL2',casewhen_lower)
-                        sql_command.append(",%s as %s   --%s\n"%(sql_cal,col_new,comment))
-                        col_ls.append(col_new)
+        
 
         max_len = max([len(x.split(' as ')[0]) for x in sql_command])
         tmp = "{:%s}"%(max_len)
@@ -157,7 +112,6 @@ class AutosqlFlowTable():
             raise ValueError('column name duplicated,please check')
         else:
             return sql_command,col_ls
-
 
 
     def _read_base_table(self,file):

@@ -8,7 +8,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 import seaborn as sns
 import json
 
-class preprocessing:
+class PreProcessing:
 	def missing_cal(self, df):
 		"""
 		purpose：
@@ -145,7 +145,7 @@ class preprocessing:
 		return feature_cat, feature_num, feature_res
 
 
-	def _CategaryMerge_(self,col,threshold,tag):
+	def _categary_merge(self,col,threshold,tag):
 		"""
 		purpose:
 			合并样本数较少的类别
@@ -163,7 +163,7 @@ class preprocessing:
 		return col,merge_cats
 		
 		
-	def __PsiOneCol__(self, trainset, testset, category_type=False):
+	def _psi_one_col(self, trainset, testset, category_type=False):
 		"""
 		purpose:
 			计算一个变量的psi稳定性，对连续性变量默认等频分10个桶进行计算
@@ -183,8 +183,8 @@ class preprocessing:
 			testset = pd.cut(testset, bins=cut_points, duplicates='drop')
 		else:
 			# 合并样本数较少的类别
-			trainset,_ = self._CategaryMerge_(trainset,36,'OTHER')
-			testset,_ = self._CategaryMerge_(testset,36,'OTHER')
+			trainset,_ = self._categary_merge(trainset,36,'OTHER')
+			testset,_ = self._categary_merge(testset,36,'OTHER')
 
 		# 计算每个类别样本数
 		trainset_df = pd.DataFrame(trainset.value_counts())
@@ -205,7 +205,7 @@ class preprocessing:
 		return psi
 		
 
-	def PsiCalculation(self, trainset, testset, cat_fea=[], num_fea=[]):
+	def psi_calculation(self, trainset, testset, cat_fea=[], num_fea=[]):
 		"""
 		purpose:
 			计算一个df指定字段的psi稳定性，对连续性变量默认等频分10个桶进行计算
@@ -220,16 +220,16 @@ class preprocessing:
 		"""
 		psi = []
 		for col in cat_fea:
-			psi.append(self.__PsiOneCol__(
+			psi.append(self._psi_one_col(
 				trainset[col], testset[col], category_type=True))
 		for col in num_fea:
-			psi.append(self.__PsiOneCol__(
+			psi.append(self._psi_one_col(
 				trainset[col], testset[col], category_type=False))
 
 		psi_df = pd.DataFrame({'columns': cat_fea+num_fea, 'psi': psi})
 		return psi_df
 
-	def __chi3__(self, arr):
+	def _chi3(self, arr):
 		'''
 		purpose:
 			计算卡方值
@@ -245,7 +245,7 @@ class preprocessing:
 		v = square.sum()
 		return v
 
-	def BucketsCutUnsupervised(self, col, method, bins_num=None, cut_points=None):
+	def buckets_cut_unsupervised(self, col, method, bins_num=None, cut_points=None):
 		"""
 		purpose:
 			对某个字段进行分析分箱
@@ -276,7 +276,7 @@ class preprocessing:
 		col_new = pd.cut(col, bins=cut_points, labels=labels).astype('int64')
 		return col_new, cut_points
 
-	def BucketsCutChiMerge(self, col, target, category_type=False, bins_num=None, threshold=None):
+	def buckets_cut_chimerge(self, col, target, category_type=False, bins_num=None, threshold=None):
 		"""
 		purpose:
 			对某个字段进行有监督分箱
@@ -298,7 +298,7 @@ class preprocessing:
 		# 连续性变量卡方分箱
 		if category_type == False:
 			# 分箱并计算每个箱中每一类的数量
-			col_new, cut_points = self.BucketsCutUnsupervised(
+			col_new, cut_points = self.buckets_cut_unsupervised(
 				col, method='qcut', bins_num=100)
 			freq = pd.crosstab(col_new, target).values
 
@@ -317,7 +317,7 @@ class preprocessing:
 
 				#寻找卡方最小的两个区间	
 				for i in range(len(freq)-1):
-					v = self.__chi3__(freq[i:i+2])
+					v = self._chi3(freq[i:i+2])
 					if minvalue is None or v < minvalue:
 						minvalue = v
 						minidx = i
@@ -332,14 +332,14 @@ class preprocessing:
 				else:
 					break
 
-			col_new,cut_points = self.BucketsCutUnsupervised(
+			col_new,cut_points = self.buckets_cut_unsupervised(
 				col, method='cust', cut_points=cut_points)
 			return col_new,cut_points
 
 		# 离散变量卡方分箱
 		else:
 			# 分箱并计算每个箱中每一类的数量
-			col_new,merge_cats = self._CategaryMerge_(col,36,'OTHER')
+			col_new,merge_cats = self._categary_merge(col,36,'OTHER')
 			freq = pd.crosstab(col_new, target)
 			tmp = list(freq.index)
 			freq = freq.values
@@ -365,7 +365,7 @@ class preprocessing:
 				#寻找卡方最小的两个类别	
 				for i in range(len(freq)-1):
 					for j in range(i+1,len(freq)):
-						v = self.__chi3__(freq[[i,j]])
+						v = self._chi3(freq[[i,j]])
 						if minvalue is None or v < minvalue:
 							minvalue = v
 							minidx_1 = i
@@ -391,7 +391,7 @@ class preprocessing:
 		
 
 
-	def WoeEncoding(self,col,target,pos_label):
+	def woe_encoding(self,col,target,pos_label):
 		"""
 		purpose:
 			对离散变量已分好桶的连续型变量进行woe编码
@@ -423,7 +423,7 @@ class preprocessing:
 		col_new = col_new.map(woe)
 		return col_new, woe
 
-	def IVCalculation(self,col,target,pos_label):
+	def iv_calculation(self,col,target,pos_label):
 		"""
 		purpose:
 			对离散变量/已分好桶的连续型变量计算iv值
@@ -442,7 +442,7 @@ class preprocessing:
 
 
 		# 合并样本数较少的类别
-		col,_ = self._CategaryMerge_(col,36,'OTHER')
+		col,_ = self._categary_merge(col,36,'OTHER')
 		
 		# 每个类别/分桶的正负样本数
 		gb_i = pd.crosstab(col,target)+eps
@@ -457,7 +457,7 @@ class preprocessing:
 						np.log((gb_i[neg_label] / gb_i[pos_label]) / ( gb_neg / gb_pos ))
 		return gb_i.iv.sum()
 
-	def VIF_calculation(self,df,subset):
+	def vif_calculation(self,df,subset):
 		"""
 		purpose:
 			计算某个字段的vif值
@@ -476,7 +476,7 @@ class preprocessing:
 		return vif
 
 
-	def VIF_filer(self, df, threshold = 10):
+	def vif_filer(self, df, threshold = 10):
 		"""
 		purpose:
 			根据VIF对特征过滤，降低共线性
@@ -493,7 +493,7 @@ class preprocessing:
 		while dropped:
 			dropped = False
 			#找出vif最大的字段，如果vif超过阈值则直接删除
-			vif_ls = self.VIF_calculation(df = df_new,subset = df_new.columns)
+			vif_ls = self.vif_calculation(df = df_new,subset = df_new.columns)
 			maxvif = max(vif_ls)
 			maxidx = vif_ls.index(maxvif)
 			maxcol = df_new.columns[maxidx]
@@ -567,8 +567,8 @@ class preprocessing:
 		return fea_tmp
 
 
-class afterprocessing:
-	def eval_binary(self,eval_list = [],legend = [],pos_label=1):
+class AfterProcessing:
+	def eval_binary(self,eval_list=[],legend=[],pos_label=1):
 		"""
 		purpose:
 			对二分类问题的结果进行检验
@@ -699,7 +699,7 @@ class afterprocessing:
 		plt.xlabel(x_label) 
 		plt.show()
 
-	def TreeExport(self,decision_tree,max_depth,feature_names=None):
+	def tree_export(self,decision_tree,max_depth,feature_names=None):
 		"""
 		purpose:
 			单棵决策树规则提取
@@ -752,7 +752,7 @@ class afterprocessing:
 		res['recall'] = res.samplecnt.map(lambda x: list(x/sample_sum))
 		return res
 
-	def ForestExport(self,random_forest,max_depth,feature_names=None):
+	def forest_export(self,random_forest,max_depth,feature_names=None):
 		"""
 		purpose:
 			随机森林规则提取
@@ -765,16 +765,16 @@ class afterprocessing:
 		"""
 		for i,decision_tree in enumerate(random_forest.estimators_):
 			if i==0:
-				res = self.TreeExport(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)
+				res = self.tree_export(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)
 			else:
-				res = pd.concat([res,self.TreeExport(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)])
+				res = pd.concat([res,self.tree_export(decision_tree=decision_tree,max_depth=max_depth,feature_names=feature_names)])
 		
 		res = res.drop_duplicates(subset = 'condition')
 
 		return res
 
 
-	def TreePrint(self,decision_tree,max_depth,feature_names=None):
+	def tree_print(self,decision_tree,max_depth,feature_names=None):
 		"""
 		purpose:
 			单棵决策树结构打印
@@ -796,7 +796,7 @@ class afterprocessing:
 		tree = [x for x in tree if len(x)>0]
 
 
-		def treeprint(tree,judge,depth_cur,max_depth):
+		def _tree_print(tree,judge,depth_cur,max_depth):
 			if len(tree)==1:  #如果到达叶节点
 				leaf = str(list(np.array(eval(re.findall(r"\[.+?\]",tree[0][4:])[0].replace(' ',''))).astype(np.int)))
 				lineformat = "{:^%s}"%(len(leaf))
@@ -820,11 +820,11 @@ class afterprocessing:
 			
 			#左树
 			subtree_left = [row[4:] for row in tree[root_index[0]+1:root_index[1]]]
-			subtopo_left = treeprint(subtree_left,'YES',depth_cur+1,max_depth=max_depth)
+			subtopo_left = _tree_print(subtree_left,'YES',depth_cur+1,max_depth=max_depth)
 
 			#右树
 			subtree_right = [row[4:] for row in tree[root_index[1]+1:root_index[2]]]
-			subtopo_right= treeprint(subtree_right,'NO',depth_cur+1,max_depth=max_depth)
+			subtopo_right= _tree_print(subtree_right,'NO',depth_cur+1,max_depth=max_depth)
 
 			#左右子树合并
 			subtopo = []
@@ -855,7 +855,7 @@ class afterprocessing:
 			res = [tmp.format(x) for x in res]
 			return res
 
-		tree_struct = '\n'.join(treeprint(tree,judge='|',depth_cur=0,max_depth=max_depth))
+		tree_struct = '\n'.join(_tree_print(tree,judge='|',depth_cur=0,max_depth=max_depth))
 		tree_struct = tree_struct.replace('[','(').replace(']',')')
 		return tree_struct
 
@@ -954,15 +954,15 @@ class Modelset:
 			config_file: string 模型参数文件
 			type: string 模型类型，分类or回归 ('classifier','regressor')
 		"""
-		self.parameters = self._paramread_(config_file)
+		self.parameters = self._paramread(config_file)
 		self.type = type
 		if type == 'classifier':		
-			self.model_dict = self._classifierdefine_()
+			self.model_dict = self._classifierdefine()
 		elif type == 'regressor':
-			self.model_dict = self._regressordefine_()
+			self.model_dict = self._regressordefine()
 
 
-	def _paramread_(self,config_file):
+	def _paramread(self,config_file):
 		"""
 		purpose:
 			读取参数文件
@@ -978,7 +978,7 @@ class Modelset:
 		return parameters
 
 
-	def _classifierdefine_(self):
+	def _classifierdefine(self):
 		"""
 		purpose:
 			根据配置文件定义分类模型对象
@@ -996,7 +996,7 @@ class Modelset:
 		return model_dict
 
 
-	def _regressordefine_(self):
+	def _regressordefine(self):
 		"""
 		purpose:
 			根据配置文件定义回归模型对象
@@ -1102,15 +1102,15 @@ class BetterTreeClassifier:
 		self.fit_rounds = fit_rounds
 		self.tree = DecisionTreeClassifier(max_depth=max_depth)
 
-	def __getrules__(self,X,y):
+	def _getrules(self,X,y):
 		self.tree.fit(X,y)
 
-		aftmethod = afterprocessing()
-		res = aftmethod.TreeExport(self.tree,max_depth=self.tree.max_depth)
+		aftmethod = AfterProcessing()
+		res = aftmethod.tree_export(self.tree,max_depth=self.tree.max_depth)
 		
 		return res[['condition','samplecnt','precision','recall']]
 
-	def __exec_rule__(self,rule,X):
+	def _exec_rule(self,rule,X):
 		X.columns = ['feature_'+str(i) for i in range(X.shape[1])]
 		tmp = '&'.join(['(X.%s)'%(x.replace(' ','')) for x in rule.split('|') if len(x)>0])
 		return eval(tmp)
@@ -1123,13 +1123,13 @@ class BetterTreeClassifier:
 		for i in range(self.fit_rounds):	
 			X_tmp = data_tmp.iloc[:,0:-1]
 			y_tmp = pd.Series(list(data_tmp.iloc[:,-1]))
-			res = self.__getrules__(X_tmp,y_tmp)
+			res = self._getrules(X_tmp,y_tmp)
 			res['pos_score'] = res.precision.map(lambda x:x[1])
 			res = res.sort_values('pos_score',ascending=False)
 			rule_final.append(res.iloc[0,0])
 			samplecnt_final.append(res.iloc[0,1])
 			precision_final.append(res.iloc[0,2])
-			data_tmp = data_tmp[(~self.__exec_rule__(res.iloc[0,0],data_tmp))]
+			data_tmp = data_tmp[(~self._exec_rule(res.iloc[0,0],data_tmp))]
 
 		rule_final = rule_final+list(res.iloc[1:,0])
 		samplecnt_final = samplecnt_final+list(res.iloc[1:,1])
@@ -1139,9 +1139,9 @@ class BetterTreeClassifier:
 		tmp  = sum(np.array(list(self.rules.samplecnt)))
 		self.rules['recall'] = self.rules.samplecnt.map(lambda x: list(np.array(x)/tmp))
 
-	def __predict_row__(self,row):
+	def _predict_row(self,row):
 		i=0
-		while self.__exec_rule__(self.rules.iloc[i,0],row)==False:
+		while self._exec_rule(self.rules.iloc[i,0],row)==False:
 			i+=1
 		return self.rules.iloc[i,1]
 
@@ -1150,5 +1150,5 @@ class BetterTreeClassifier:
 		for i in self.rules.index:
 			rule = self.rules.loc[i,'condition']
 			score = self.rules.loc[i,'precision']
-			res[(res[:,0]==-1)&self.__exec_rule__(rule,X),:]=score
+			res[(res[:,0]==-1)&self._exec_rule(rule,X),:]=score
 		return res

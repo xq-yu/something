@@ -4,7 +4,7 @@ import pandas as pd
 importlib.reload(mytool)
 
 
-#模型快速试跑与调参
+# mytool test
 if __name__ == '__main__':
 
     # ###########
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     #     modelset.fit(model_nm=i,X_train=X,y_train=y,eval_set=[(X,y)])
     # for i in modelset.model_dict.keys():
     #     y_hat = modelset.predict(model_nm=i,X = X)
-    #     aftpro = mytool.afterprocessing()
+    #     aftpro = mytool.AfterProcessing()
     #     aftpro.eval_binary(eval_list=[(y,y_hat)],legend=['train'])
 
     # gs = modelset.grid_search('XGBClassifier',X_train=X,y_train=y,parameters={'max_depth':[1,2,3,4,5]},cv=3)
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     #     modelset.fit(model_nm=i,X_train=X,y_train=y,eval_set=[(X,y)])
     # for i in modelset.model_dict.keys():
     #     y_hat = modelset.predict(model_nm=i,X = X)
-    #     aftpro = mytool.afterprocessing()
+    #     aftpro = mytool.AfterProcessing()
     #     aftpro.eval_regression(eval_list=[(y,y_hat)],legend=['train'])
 
     # gs = modelset.grid_search('XGBRegressor',X_train=X,y_train=y,parameters={'max_depth':[1,2,3,4,5]},cv=3)
@@ -61,23 +61,19 @@ if __name__ == '__main__':
     # y = sample.iloc[:,20]
     # decision_tree = DecisionTreeClassifier(max_depth=5)
     # decision_tree.fit(X,y)
-    # aftmethod = mytool.afterprocessing()
-    # df = aftmethod.TreeExport(decision_tree,max_depth = 5)
-    # tree = aftmethod.TreePrint(decision_tree,max_depth = 5)
+    # aftmethod = mytool.Afterprocessing()
+    # df = aftmethod.tree_export(decision_tree,max_depth = 5)
+    # tree = aftmethod.tree_print(decision_tree,max_depth = 5)
     # print(tree)
 
 
     #############
     # BetterTreeClassifier test
     #############
-    import mytool
-    import importlib
-    import pandas as pd
-    importlib.reload(mytool)
     sample = pd.read_csv('./SampleClassification.csv')
     X = sample.iloc[:,0:19]
     y = sample.iloc[:,20]
-    BT = mytool.BetterTreeClassifier(max_depth=5,fit_rounds = 3)
+    BT = mytool.BetterTreeClassifier(max_depth=2,fit_rounds = 2)
     BT.fit(X,y)
 
     BT.rules
