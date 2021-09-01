@@ -128,10 +128,10 @@ class mynetwork(nn.Module):
         h_output = self.net_rnn(embedded)  # 最后一层隐藏层的输出序列,作为attention key和value
         h_n = h_output[:, -1:, :]  # 最后一个step的隐藏层输出
 
-        x = F.relu(self.fc1(h_n))  # 做一层全连接，作为 query_seqß
+        x = F.relu(self.fc1(h_n))  # 做一层全连接，作为 query_seq
         x = F.relu(self.fc2(x))
         x = self.net_attenion(key_seq=h_output,
-                              value_seq=h_output,
+                              value_seq=x,
                               query_seq=x)
         x = self.classifier(x[:, 0, :])
         return x
@@ -277,5 +277,3 @@ def submit(model, testset_iter):
 df = submit(model, test_batch_iter)
 df = df.sort_values('PhraseId').reset_index(drop=True)
 df.to_csv('./submisstion.csv', index=False)
-
-

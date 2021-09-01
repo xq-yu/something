@@ -7,7 +7,7 @@ class AutosqlFlowTable():
     流水数据脚本自动化生成
     """
 
-    def __init__(self,basic_param,fun_dict):
+    def __init__(self,basic_param):
         """
         purpose:
             流水数据特征自动sql脚本生成
@@ -36,9 +36,11 @@ class AutosqlFlowTable():
                 'maxabs':   'max(abs          (  COL1  ))',
                 'minabs':   'min(abs          (  COL1  ))',
                 'avgabs':   'avg(abs          (  COL1  ))',
+                'skew':     '(avg(pow(COL1,3))-3*avg(COL1)*pow(std(COL1),2) - pow(avg(COL1),3))/(pow(std(COL1),3) + 0.01)',
                 'pctsum':   'sum              (  COL1  )/sum(COL2)',
                 'pctcnt':   'count            (  COL1  )/count(COL2)',
                 'pctcntdist':   'count(distinct   (  COL1  ))/count(distinct   (  COL2  ))'
+
         }
         fun_dict_new = {}
         for i in fun_dict.keys():
@@ -94,7 +96,7 @@ class AutosqlFlowTable():
                 raise ValueError("columns %s not matched with base table"%(i))
 
         condition_ls = []
-        self._condition_combine(condition_ls,('1','',''),config['condition_cols'],window)
+        self._condition_combine(condition_ls,('1=1','',''),config['condition_cols'],window)
         max_len = max([len("case when %s then  else null end"%(x[0])) for x in condition_ls])+max([len(x) for x in config['objects']])
 
 
@@ -126,10 +128,10 @@ class AutosqlFlowTable():
         for obj in (x for x in config['objects']):    #统计目标循环
             for fun_nm in fun_pct:
                 fun = self.fun_dict[fun_nm.split('_')[0]]
-                pct_part = fun_nm.split('_')[1]  #百分比分母条件字段
+                pct_part = '_'.join(fun_nm.split('_')[1:])  #百分比分母条件字段
                 condition_lower_ls = []
                 tmp = [x for x in config['condition_cols'] if x[0]!=pct_part]
-                self._condition_combine(condition_lower_ls,('1','',''),tmp,window)
+                self._condition_combine(condition_lower_ls,('1=1','',''),tmp,window)
             
                 for condition_lower in condition_lower_ls:
                     condition_upper_ls = []
@@ -213,7 +215,10 @@ class AutosqlFlowTable():
         table = [['' for i in range(5)] for i in range(data.nrows)]
         for i in range(5):
             for j in range(data.nrows):
-                table[j][i] = data.cell(j,i).value.strip().upper()
+                if "'" in data.cell(j,i).value:
+                    table[j][i] = data.cell(j,i).value.strip()
+                else:
+                    table[j][i] = data.cell(j,i).value.strip().upper()
         table = [x for x in table if sum([len(i) for i in x])!=0]
 
         # 空值向下填充方便后续操作
