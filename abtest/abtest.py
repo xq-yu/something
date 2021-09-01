@@ -355,7 +355,7 @@ from
     select 
         usrid,
         '%s' as exp_name,
-        ,%s as layer_id,
+        %s as layer_id,
         case
         %s
         end as group_id,
