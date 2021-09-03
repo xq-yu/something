@@ -1,0 +1,38 @@
+<head>
+    <meta charset="UTF-8">
+    <title>表单对齐</title>
+    <style type="text/css">
+        form{
+            width: 900px;
+            font:14px bold "Microsoft Yahei";
+        }
+        label:not(.nlabel){
+            float: left;
+            width: 120px;
+            height: 42px;
+            text-align: right;
+            margin-right: 10px;
+            line-height: 42px;
+            color: rgb(102, 102, 102);
+            font-weight: 700;
+        }
+    
+    </style>
+</head>
+
+
+
+
+<h2>Create Layer</h2>
+<form action="/create_layer/create" method="get">
+    <p><label for='tmp'>layer_id:</label> <input type="text" style="width:300px;height:30px" name="layer_id" /></p>
+    <p><label for='tmp'>field_id:</label> <input type="text" style="width:300px;height:30px" name="field_id" /></p>
+    <p><label for='tmp'>hash_col:</label> <input type="text"  style="width:300px;height:30px" name="hash_col" /></p>
+    <p><label for='tmp'>hash_method:</label>  <input type="text" style="width:300px;height:30px" name="hash_method" /></p>
+    <p><label for='tmp'>bucket_num:</label>  <input type="text" style="width:300px;height:30px" name="bucket_num" /></p>
+    <p><label for='tmp'>comment:</label>  <input type="text" style="width:300px;height:30px" name="comment" /></p>
+    <p><label for='tmp'>creator:</label>  <input type="text" style="width:300px;height:30px" name="creator" /></p>
+    <p><label for='tmp'>available_flg:</label>  <input type="text" style="width:300px;height:30px" name="available_flg" /></p>
+    <p><label for='tmp'>create_time:</label>  <input type="text"style="width:300px;height:30px" name="create_time" /></p>
+    <input type="submit" value="Create" />
+</form>

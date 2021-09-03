@@ -130,13 +130,13 @@ cd /Users/yu/Desktop/work/unionpay/项目/abtest/
 
 
 ###################管理实验
-# exp_id=9
-# #'start' 'stop' 'info' 'delete'
-# python3 demo06_exp_manager.py "$exp_id" 'start'
+exp_id=9
+#'start' 'stop' 'info' 'delete'
+python3 demo06_exp_manager.py "$exp_id" 'delete'
 
 
 
 ###################查看实验分布
-python3 demo04_over_view.py
+# python3 demo04_over_view.py
 
 

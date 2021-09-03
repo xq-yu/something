@@ -103,9 +103,13 @@ sklearn2pmml(tmp, "./xgb_v2.pmml", with_repr = True)
 
 premethod = mytool.PreProcessing()
 import numpy as np
-premethod.chi2_test(np.array([[3713,30990-3713],[4386,33449-4386]]))
-premethod.chi2_test(np.array([[463,4922],[501,4930]]))
+premethod.chi2_test(np.array([[221668,14],[222104,33]]))
+premethod.chi2_test(np.array([[1523,3344-1523],[1458,3182-1458]]))
 
-premethod.chi2_test(np.array([[1040,68378],[1961,209621]]))
-premethod.chi2_test(np.array([[871,68377],[1412,209620]]))
+premethod.chi2_test(np.array([[500+306,2016+2055],[1824+1135,7012+6973]]))
+premethod.chi2_test(np.array([[2138137+828973,526+4674],[227511+163801+226897+164924,45+696+53+685]]))
+
+premethod.chi2_test(np.array([[227543+165106,25+325],[227511+163801+226897+164924,27+385+24+355]]))
+
+premethod.chi2_test(np.array([[2138137+828973,4329+5509],[227511+163801+226897+164924,423+861+452+851]]))
 

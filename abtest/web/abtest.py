@@ -429,7 +429,9 @@ where group_id is not null
                     tmp+='-'
                 ax.add_patch(rect)
             text.append('%s | %s'%(layer_id,tmp))
-        plt.show()
+        #plt.show()
+        plt.savefig('./static/img/overview.png')
+        plt.close()
         print('\n'.join(text))
 
 
