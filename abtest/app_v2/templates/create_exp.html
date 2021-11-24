@@ -1,0 +1,40 @@
+<head>
+    <meta charset="UTF-8">
+    <title>表单对齐</title>
+    <style type="text/css">
+        form{
+            width: 900px;
+            font:14px bold "Microsoft Yahei";
+        }
+        label:not(.nlabel){
+            float: left;
+            width: 120px;
+            height: 42px;
+            text-align: right;
+            margin-right: 10px;
+            line-height: 42px;
+            color: rgb(102, 102, 102);
+            font-weight: 700;
+        }
+    
+    </style>
+</head>
+
+
+
+<h2>Create experiment</h2>
+<form action="/create_exp/create" method="get">
+    <p><label for='tmp'>exp_id:</label> <input type="text" style="width:300px;height:30px" value="{{exp_id}}" name="exp_id" /></p>
+    <p><label for='tmp'>exp_name:</label> <input type="text" style="width:300px;height:30px" value="{{exp_name}}" name="exp_name" /></p>
+    <p><label for='tmp'>department:</label> <input type="text"  style="width:300px;height:30px" value="{{department}}" name="department" /></p>
+    <p><label for='tmp'>admin:</label>  <input type="text" style="width:300px;height:30px" value="{{admin}}" name="admin" /></p>
+    <p><label for='tmp'>field:</label>  <input type="text" style="width:300px;height:30px" value="{{field}}" name="field" /></p>
+    <p><label for='tmp'>layer:</label>  <input type="text" style="width:300px;height:30px" value="{{layer}}" name="layer" /></p>
+    <p><label for='tmp'>create_time:</label>  <input type="text" style="width:300px;height:30px" value="{{create_time}}" name="create_time" /></p>
+    <p><label for='tmp'>comment:</label>  <input type="text" style="width:300px;height:30px" value="{{comment}}" name="comment" /></p>
+    <p><label for='tmp'>group_info:</label>  <textarea name="group_info" cols="30" rows="4">{{group_info}}</textarea> </p>
+    <pre>例：<br> 1;1~50;组1 <br> 2;51,52;组2</pre>
+    <p><label for='tmp'>pre_sql:</label>  <textarea name="pre_sql" cols="30" rows="4">{{pre_sql}}</textarea> </p>
+    <pre>例：select usrid,ext_col1,ext_col2,ext_col3,ext_col4,ext_col5 from sub_table</pre>
+    <input type="submit" value="Create" />
+</form>

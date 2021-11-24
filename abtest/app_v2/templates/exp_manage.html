@@ -1,0 +1,104 @@
+<head>
+    <meta charset="UTF-8">
+    <title>表单对齐</title>
+    <style type="text/css">
+        form{
+            width: 20px;
+            height: 10px;
+            font:14px bold "Microsoft Yahei";
+        }
+        label:not(.nlabel){
+            float: left;
+            width: 120px;
+            height: 42px;
+            text-align: right;
+            margin-right: 10px;
+            line-height: 42px;
+            color: rgb(102, 102, 102);
+            font-weight: 700;
+        }
+    
+    </style>
+</head>
+
+
+<h2>experiment manage</h2>
+
+<div>
+<table border="1">
+    <tr>
+        <th width=60px>实验id</th>
+        <th width=400px>实验名称</th>
+        <th width=80px>所属团队</th>
+        <th width=80px>联系人</th>
+        <th width=60px>实验域</th>
+        <th width=60px>实验层</th>
+        <th width=160px>创建时间</th>
+        <th width=240px>实验说明</th>
+        <th width=80px>状态</th>
+        <th width=160px>操作</th>
+    </tr>
+        {% for i in exp %}
+            <tr>
+                <td>{{ i[0] }}</td>
+                <td>{{ i[1] }}</td>
+                <td>{{ i[2] }}</td>
+                <td>{{ i[3] }}</td>
+                <td>{{ i[4] }}</td>
+                <td>{{ i[5] }}</td>
+                <td>{{ i[6] }}</td>
+                <td>{{ i[7] }}</td>
+                <td>{{ i[8] }}</td>
+                <td>
+
+                    <table border="1">
+                        <tr>
+                      
+                            <form width=30px action="/exp_manage/opt/" method="get">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="start">
+                                <input type="submit" value="启动" />
+                            </form>
+                            <form width=30px action="/exp_manage/opt/" method="get">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="stop">
+                                <input type="submit" value="停止" />
+                            </form>
+                            <form width=30px action="/exp_manage/opt/" method="get" target="_blank">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="more">
+                                <input type="submit" value="详情" />
+                            </form>
+        
+                            <form width=30px action="/exp_manage/opt/" method="get" target="_blank">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="edit">
+                                <input type="submit" value="编辑" />
+                            </form>
+                            
+                            <form width=30px action="/exp_manage/opt/" method="get">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="delete">
+                                <input type="submit" value="删除" />
+                            </form>
+        
+                            <form width=30px  method="get" target="_blank">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="copy">
+                                <input type="button" value="复制" />
+                            </form>
+
+                            <form width=30px  method="get" target="_blank">
+                                <input type="hidden" name="exp_id" value="{{ i[0] }}">
+                                <input type="hidden" name="opt" value="exec">
+                                <input type="button" value="执行" />
+                            </form>
+                      
+                        </tr>
+                      </table>
+
+                </td>
+            </tr>
+    {% endfor %}
+</table>
+</div>
